@@ -5,6 +5,9 @@ import id.ac.ui.cs.advprog.kebun.repository.KebunRepository;
 import id.ac.ui.cs.advprog.kebun.validation.OverlapValidator;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.Optional;
+
 @Service
 public class KebunService {
 
@@ -19,5 +22,13 @@ public class KebunService {
     public Kebun create(Kebun kebun) {
         overlapValidator.validateNoOverlap(kebun.getCoordinates());
         return kebunRepository.save(kebun);
+    }
+
+    public Optional<Kebun> getByCode(String code) {
+        return kebunRepository.findByCode(code);
+    }
+
+    public List<Kebun> findByName(String name) {
+        return kebunRepository.findByNameContainingIgnoreCase(name);
     }
 }
