@@ -19,10 +19,12 @@ public class OverlapValidatorImpl implements OverlapValidator {
 
     @Override
     public void validateNoOverlap(List<Kebun.Point> points) {
-        Polygon polygon = GeometryMapper.toPolygon(points);
-        boolean intersects = kebunRepository.existsIntersecting(polygon);
+        if (points == null || points.isEmpty()) {
+            throw new IllegalArgumentException("Kebun coordinates are required for overlap validation");
+        }
 
-        if (intersects) {
+        Polygon polygon = GeometryMapper.toPolygon(points);
+        if (kebunRepository.existsIntersecting(polygon)) {
             throw new IllegalArgumentException("Kebun coordinates overlap with an existing kebun");
         }
     }
