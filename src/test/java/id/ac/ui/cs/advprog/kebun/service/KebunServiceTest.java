@@ -173,4 +173,20 @@ class KebunServiceTest {
 
         verify(kebunRepository, never()).assignMandor(any(), any());
     }
+
+    @Test
+    void unassignMandorShouldThrowWhenNoReplacementProvided() {
+        assertThrows(IllegalArgumentException.class,
+                () -> kebunService.unassignMandor("KBNA01", "mandor-123", null));
+
+        verify(kebunRepository, never()).unassignMandor(any(), any());
+    }
+
+    @Test
+    void unassignMandorShouldPersistWhenReplacementProvided() {
+        kebunService.unassignMandor("KBNA01", "mandor-123", "mandor-456");
+
+        verify(kebunRepository, times(1)).unassignMandor("KBNA01", "mandor-123");
+        verify(kebunRepository, times(1)).assignMandor("KBNA01", "mandor-456");
+    }
 }
