@@ -148,4 +148,29 @@ class KebunServiceTest {
 
         verify(kebunRepository, times(1)).deleteByCode("KBNA01");
     }
+
+    @Test
+    void assignMandorShouldPersistAssignmentWhenKebunExists() {
+        Kebun existing = Kebun.builder()
+                .name("Kebun Sawit A")
+                .code("KBNA01")
+                .luas(100.0)
+                .build();
+
+        when(kebunRepository.findByCode("KBNA01")).thenReturn(Optional.of(existing));
+
+        kebunService.assignMandor("KBNA01", "mandor-123");
+
+        verify(kebunRepository, times(1)).assignMandor("KBNA01", "mandor-123");
+    }
+
+    @Test
+    void assignMandorShouldThrowWhenKebunNotFound() {
+        when(kebunRepository.findByCode("UNKNOWN")).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> kebunService.assignMandor("UNKNOWN", "mandor-123"));
+
+        verify(kebunRepository, never()).assignMandor(any(), any());
+    }
 }
