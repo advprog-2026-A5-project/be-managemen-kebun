@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
@@ -84,5 +85,49 @@ class KebunServiceTest {
 
         assertEquals(2, results.size());
         verify(kebunRepository, times(1)).findByNameContainingIgnoreCase("Sawit");
+    }
+
+    @Test
+    void updateShouldThrowWhenCodeIsChanged() {
+        Kebun existing = Kebun.builder()
+                .name("Kebun Sawit A")
+                .code("KBNA01")
+                .luas(100.0)
+                .build();
+
+        Kebun updateRequest = Kebun.builder()
+                .name("Kebun Sawit A Updated")
+                .code("DIFFERENT")
+                .luas(150.0)
+                .build();
+
+        when(kebunRepository.findByCode("KBNA01")).thenReturn(Optional.of(existing));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> kebunService.update("KBNA01", updateRequest));
+    }
+
+    @Test
+    void updateShouldPersistWhenCodeRemainsUnchanged() {
+        Kebun existing = Kebun.builder()
+                .name("Kebun Sawit A")
+                .code("KBNA01")
+                .luas(100.0)
+                .build();
+
+        Kebun updateRequest = Kebun.builder()
+                .name("Kebun Sawit A Updated")
+                .code("KBNA01")
+                .luas(150.0)
+                .build();
+
+        when(kebunRepository.findByCode("KBNA01")).thenReturn(Optional.of(existing));
+        when(kebunRepository.save(updateRequest)).thenReturn(updateRequest);
+
+        Kebun updated = kebunService.update("KBNA01", updateRequest);
+
+        assertEquals("KBNA01", updated.getCode());
+        assertEquals("Kebun Sawit A Updated", updated.getName());
+        verify(kebunRepository, times(1)).save(updateRequest);
     }
 }
