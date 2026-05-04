@@ -62,10 +62,53 @@ public class Kebun {
         }
 
         public Kebun build() {
-            if (coordinates != null && coordinates.size() != 4) {
-                throw new IllegalArgumentException("Kebun must have exactly 4 coordinate points");
+            if (coordinates != null) {
+                if (coordinates.size() != 4) {
+                    throw new IllegalArgumentException("Kebun must have exactly 4 coordinate points");
+                }
+                if (!formsSquare(coordinates)) {
+                    throw new IllegalArgumentException("Kebun coordinates must form a square");
+                }
             }
             return new Kebun(this);
+        }
+
+        private boolean formsSquare(List<Point> points) {
+            double[] distances = new double[6];
+            int idx = 0;
+
+            for (int i = 0; i < points.size(); i++) {
+                for (int j = i + 1; j < points.size(); j++) {
+                    distances[idx++] = squaredDistance(points.get(i), points.get(j));
+                }
+            }
+
+            java.util.Arrays.sort(distances);
+
+            double side = distances[0];
+            double diag = distances[4];
+
+            if (side <= 0) {
+                return false;
+            }
+
+            return almostEqual(distances[0], side)
+                    && almostEqual(distances[1], side)
+                    && almostEqual(distances[2], side)
+                    && almostEqual(distances[3], side)
+                    && almostEqual(distances[4], diag)
+                    && almostEqual(distances[5], diag)
+                    && almostEqual(diag, 2 * side);
+        }
+
+        private double squaredDistance(Point a, Point b) {
+            double dx = a.getX() - b.getX();
+            double dy = a.getY() - b.getY();
+            return dx * dx + dy * dy;
+        }
+
+        private boolean almostEqual(double a, double b) {
+            return Math.abs(a - b) < 1e-9;
         }
     }
 
