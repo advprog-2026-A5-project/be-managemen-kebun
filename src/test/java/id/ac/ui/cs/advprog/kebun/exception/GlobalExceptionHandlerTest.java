@@ -6,11 +6,13 @@ import id.ac.ui.cs.advprog.kebun.service.KebunService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -29,14 +31,8 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void shouldMapIllegalArgumentExceptionToBadRequest() throws Exception {
-        Kebun updateRequest = Kebun.builder()
-                .name("Invalid")
-                .code("DIFFERENT")
-                .luas(100.0)
-                .build();
-
         doThrow(new IllegalArgumentException("Kebun code is immutable and cannot be changed"))
-                .when(kebunService).update("KBNA01", updateRequest);
+                .when(kebunService).update(eq("KBNA01"), any(Kebun.class));
 
         String requestBody = """
                 {

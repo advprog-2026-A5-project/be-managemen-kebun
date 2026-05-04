@@ -1,7 +1,13 @@
 package id.ac.ui.cs.advprog.kebun.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
+
 import java.util.List;
 
+@JsonDeserialize(builder = Kebun.Builder.class)
 public class Kebun {
     private final String name;
     private final String code;
@@ -35,6 +41,7 @@ public class Kebun {
         return coordinates;
     }
 
+    @JsonPOJOBuilder(withPrefix = "")
     public static class Builder {
         private String name;
         private String code;
@@ -116,7 +123,8 @@ public class Kebun {
         private final double x;
         private final double y;
 
-        public Point(double x, double y) {
+        @JsonCreator
+        public Point(@JsonProperty("x") double x, @JsonProperty("y") double y) {
             this.x = x;
             this.y = y;
         }
