@@ -56,4 +56,13 @@ public class KebunService {
 
         kebunRepository.assignMandor(kebunCode, mandorId);
     }
+
+    public void unassignMandor(String kebunCode, String oldMandorId, String replacementMandorId) {
+        if (replacementMandorId == null || replacementMandorId.isBlank()) {
+            throw new IllegalArgumentException("Replacement mandor is required before unassignment");
+        }
+
+        kebunRepository.unassignMandor(kebunCode, oldMandorId);
+        kebunRepository.assignMandor(kebunCode, replacementMandorId);
+    }
 }

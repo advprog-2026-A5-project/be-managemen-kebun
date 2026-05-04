@@ -19,5 +19,7 @@ public interface KebunRepository {
 
     void assignMandor(String kebunCode, String mandorId);
 
+    void unassignMandor(String kebunCode, String mandorId);
+
     void deleteByCode(String code);
 }
