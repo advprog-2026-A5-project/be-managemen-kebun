@@ -244,5 +244,52 @@ class KebunServiceTest {
 
         org.junit.jupiter.api.Assertions.assertEquals(1, maxConcurrentInSave.get());
     }
+
+    @Test
+    void updateShouldBeSerializedToPreventConcurrentWriteRace() throws Exception {
+        Kebun existing = Kebun.builder()
+                .name("Kebun Sawit A")
+                .code("KBNA01")
+                .luas(100.0)
+                .build();
+
+        Kebun updateRequest = Kebun.builder()
+                .name("Kebun Sawit A Updated")
+                .code("KBNA01")
+                .luas(150.0)
+                .build();
+
+        when(kebunRepository.findByCode("KBNA01")).thenReturn(Optional.of(existing));
+
+        java.util.concurrent.CountDownLatch firstEnteredSave = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch releaseFirstSave = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger inSave = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicInteger maxConcurrentInSave = new java.util.concurrent.atomic.AtomicInteger(0);
+
+        when(kebunRepository.save(any(Kebun.class))).thenAnswer(invocation -> {
+            int now = inSave.incrementAndGet();
+            maxConcurrentInSave.updateAndGet(prev -> Math.max(prev, now));
+            firstEnteredSave.countDown();
+            releaseFirstSave.await(2, java.util.concurrent.TimeUnit.SECONDS);
+            inSave.decrementAndGet();
+            return invocation.getArgument(0);
+        });
+
+        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+        java.util.concurrent.Future<Kebun> f1 = executor.submit(() -> kebunService.update("KBNA01", updateRequest));
+
+        firstEnteredSave.await(2, java.util.concurrent.TimeUnit.SECONDS);
+
+        java.util.concurrent.Future<Kebun> f2 = executor.submit(() -> kebunService.update("KBNA01", updateRequest));
+        Thread.sleep(150);
+
+        releaseFirstSave.countDown();
+
+        f1.get(2, java.util.concurrent.TimeUnit.SECONDS);
+        f2.get(2, java.util.concurrent.TimeUnit.SECONDS);
+        executor.shutdownNow();
+
+        org.junit.jupiter.api.Assertions.assertEquals(1, maxConcurrentInSave.get());
+    }
 }
 
