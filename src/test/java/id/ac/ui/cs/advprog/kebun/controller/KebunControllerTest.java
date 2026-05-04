@@ -13,9 +13,12 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -90,5 +93,39 @@ class KebunControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("KBNA01"))
                 .andExpect(jsonPath("$[1].code").value("KBNB02"));
+    }
+
+    @Test
+    void updateKebunShouldReturnUpdatedPayload() throws Exception {
+        Kebun updated = Kebun.builder()
+                .name("Kebun Sawit A Updated")
+                .code("KBNA01")
+                .luas(150.0)
+                .build();
+
+        when(kebunService.update(any(), any(Kebun.class))).thenReturn(updated);
+
+        String requestBody = """
+                {
+                  "name": "Kebun Sawit A Updated",
+                  "code": "KBNA01",
+                  "luas": 150.0
+                }
+                """;
+
+        mockMvc.perform(put("/kebun/{code}", "KBNA01")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("KBNA01"))
+                .andExpect(jsonPath("$.luas").value(150.0));
+    }
+
+    @Test
+    void deleteKebunShouldReturnNoContent() throws Exception {
+        doNothing().when(kebunService).delete("KBNA01");
+
+        mockMvc.perform(delete("/kebun/{code}", "KBNA01"))
+                .andExpect(status().isNoContent());
     }
 }
