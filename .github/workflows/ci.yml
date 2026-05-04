@@ -49,3 +49,29 @@ jobs:
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.organization=mysawit \
             --no-daemon
+
+  deploy-aws:
+    name: CD Deploy to AWS Learner Lab
+    runs-on: ubuntu-latest
+    needs: test-and-sonar
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (Learner Lab)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Placeholder deployment step
+        run: |
+          echo "AWS CD pipeline is configured."
+          echo "Replace this with your target deployment command (ECS/EKS/EC2) in later steps."
