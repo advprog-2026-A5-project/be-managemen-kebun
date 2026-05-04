@@ -27,7 +27,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 21
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -40,6 +40,11 @@ jobs:
 
       - name: Run tests
         run: gradle test --no-daemon
+
+      - name: Validate Sonar secrets
+        run: |
+          [ -n "${{ secrets.SONAR_TOKEN }}" ] || (echo "SONAR_TOKEN is missing" && exit 1)
+          [ -n "${{ secrets.SONAR_PROJECT_KEY }}" ] || (echo "SONAR_PROJECT_KEY is missing" && exit 1)
 
       - name: SonarCloud analysis
         env:
