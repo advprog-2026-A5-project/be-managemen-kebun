@@ -16,6 +16,10 @@ import java.util.function.Supplier;
 @Service
 public class KebunService {
 
+    private static final String ERR_CODE_IMMUTABLE = "Kebun code is immutable and cannot be changed";
+    private static final String ERR_ACTIVE_MANDOR_DELETE = "Cannot delete kebun with active mandor";
+    private static final String ERR_REPLACEMENT_REQUIRED = "Replacement mandor is required before unassignment";
+
     private final KebunRepository kebunRepository;
     private final OverlapValidator overlapValidator;
     private final KafkaTemplate<String, Object> kafkaTemplate;
@@ -49,11 +53,10 @@ public class KebunService {
 
     public Kebun update(String code, Kebun updateRequest) {
         return executeWithWriteLock(() -> {
-            Kebun existing = kebunRepository.findByCode(code)
-                    .orElseThrow(() -> new IllegalArgumentException("Kebun not found with code: " + code));
+            Kebun existing = requireKebunByCode(code);
 
             if (!existing.getCode().equals(updateRequest.getCode())) {
-                throw new IllegalArgumentException("Kebun code is immutable and cannot be changed");
+                throw new IllegalArgumentException(ERR_CODE_IMMUTABLE);
             }
 
             return kebunRepository.save(updateRequest);
@@ -62,26 +65,29 @@ public class KebunService {
 
     public void delete(String code) {
         if (kebunRepository.existsActiveMandorByKebunCode(code)) {
-            throw new IllegalStateException("Cannot delete kebun with active mandor");
+            throw new IllegalStateException(ERR_ACTIVE_MANDOR_DELETE);
         }
         kebunRepository.deleteByCode(code);
     }
 
     public void assignMandor(String kebunCode, String mandorId) {
-        kebunRepository.findByCode(kebunCode)
-                .orElseThrow(() -> new IllegalArgumentException("Kebun not found with code: " + kebunCode));
-
+        requireKebunByCode(kebunCode);
         kebunRepository.assignMandor(kebunCode, mandorId);
         kafkaTemplate.send(mandorAssignedTopic, kebunCode, new MandorAssignedEvent(kebunCode, mandorId));
     }
 
     public void unassignMandor(String kebunCode, String oldMandorId, String replacementMandorId) {
         if (replacementMandorId == null || replacementMandorId.isBlank()) {
-            throw new IllegalArgumentException("Replacement mandor is required before unassignment");
+            throw new IllegalArgumentException(ERR_REPLACEMENT_REQUIRED);
         }
 
         kebunRepository.unassignMandor(kebunCode, oldMandorId);
         kebunRepository.assignMandor(kebunCode, replacementMandorId);
+    }
+
+    private Kebun requireKebunByCode(String code) {
+        return kebunRepository.findByCode(code)
+                .orElseThrow(() -> new IllegalArgumentException("Kebun not found with code: " + code));
     }
 
     private <T> T executeWithWriteLock(Supplier<T> action) {
