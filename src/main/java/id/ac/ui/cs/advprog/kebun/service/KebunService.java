@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 
 @Service
 public class KebunService {
@@ -32,13 +33,10 @@ public class KebunService {
     }
 
     public Kebun create(Kebun kebun) {
-        writeLock.lock();
-        try {
+        return executeWithWriteLock(() -> {
             overlapValidator.validateNoOverlap(kebun.getCoordinates());
             return kebunRepository.save(kebun);
-        } finally {
-            writeLock.unlock();
-        }
+        });
     }
 
     public Optional<Kebun> getByCode(String code) {
@@ -50,8 +48,7 @@ public class KebunService {
     }
 
     public Kebun update(String code, Kebun updateRequest) {
-        writeLock.lock();
-        try {
+        return executeWithWriteLock(() -> {
             Kebun existing = kebunRepository.findByCode(code)
                     .orElseThrow(() -> new IllegalArgumentException("Kebun not found with code: " + code));
 
@@ -60,9 +57,7 @@ public class KebunService {
             }
 
             return kebunRepository.save(updateRequest);
-        } finally {
-            writeLock.unlock();
-        }
+        });
     }
 
     public void delete(String code) {
@@ -87,5 +82,14 @@ public class KebunService {
 
         kebunRepository.unassignMandor(kebunCode, oldMandorId);
         kebunRepository.assignMandor(kebunCode, replacementMandorId);
+    }
+
+    private <T> T executeWithWriteLock(Supplier<T> action) {
+        writeLock.lock();
+        try {
+            return action.get();
+        } finally {
+            writeLock.unlock();
+        }
     }
 }
