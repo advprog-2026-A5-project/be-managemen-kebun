@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,5 +39,21 @@ class OverlapValidatorImplTest {
         when(kebunRepository.existsIntersecting(newPolygon)).thenReturn(false);
 
         assertDoesNotThrow(() -> overlapValidator.validateNoOverlap(points));
+    }
+
+    @Test
+    void validateShouldThrowWhenExistingKebunOverlaps() {
+        List<Kebun.Point> points = List.of(
+                new Kebun.Point(1, 1),
+                new Kebun.Point(1, 3),
+                new Kebun.Point(3, 3),
+                new Kebun.Point(3, 1)
+        );
+
+        Polygon newPolygon = GeometryMapper.toPolygon(points);
+
+        when(kebunRepository.existsIntersecting(newPolygon)).thenReturn(true);
+
+        assertThrows(IllegalArgumentException.class, () -> overlapValidator.validateNoOverlap(points));
     }
 }
