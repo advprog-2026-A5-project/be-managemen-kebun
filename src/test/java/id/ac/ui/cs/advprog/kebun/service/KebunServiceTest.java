@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -129,5 +130,22 @@ class KebunServiceTest {
         assertEquals("KBNA01", updated.getCode());
         assertEquals("Kebun Sawit A Updated", updated.getName());
         verify(kebunRepository, times(1)).save(updateRequest);
+    }
+
+    @Test
+    void deleteShouldThrowWhenMandorIsStillActive() {
+        when(kebunRepository.existsActiveMandorByKebunCode("KBNA01")).thenReturn(true);
+
+        assertThrows(IllegalStateException.class, () -> kebunService.delete("KBNA01"));
+        verify(kebunRepository, never()).deleteByCode("KBNA01");
+    }
+
+    @Test
+    void deleteShouldProceedWhenNoActiveMandor() {
+        when(kebunRepository.existsActiveMandorByKebunCode("KBNA01")).thenReturn(false);
+
+        kebunService.delete("KBNA01");
+
+        verify(kebunRepository, times(1)).deleteByCode("KBNA01");
     }
 }
