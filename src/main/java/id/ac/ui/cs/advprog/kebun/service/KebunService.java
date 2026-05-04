@@ -49,4 +49,11 @@ public class KebunService {
         }
         kebunRepository.deleteByCode(code);
     }
+
+    public void assignMandor(String kebunCode, String mandorId) {
+        kebunRepository.findByCode(kebunCode)
+                .orElseThrow(() -> new IllegalArgumentException("Kebun not found with code: " + kebunCode));
+
+        kebunRepository.assignMandor(kebunCode, mandorId);
+    }
 }

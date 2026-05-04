@@ -17,5 +17,7 @@ public interface KebunRepository {
 
     boolean existsActiveMandorByKebunCode(String code);
 
+    void assignMandor(String kebunCode, String mandorId);
+
     void deleteByCode(String code);
 }
