@@ -85,4 +85,38 @@ class KebunTest {
                 .coordinates(points)
                 .build());
     }
+
+    @Test
+    void builderShouldRejectWhenCoordinatesDoNotFormSquare() {
+        List<Kebun.Point> points = List.of(
+                new Kebun.Point(0, 0),
+                new Kebun.Point(0, 2),
+                new Kebun.Point(1, 2),
+                new Kebun.Point(1, 0)
+        );
+
+        assertThrows(IllegalArgumentException.class, () -> Kebun.builder()
+                .name("Kebun Sawit F")
+                .code("KBNF06")
+                .luas(60.0)
+                .coordinates(points)
+                .build());
+    }
+
+    @Test
+    void builderShouldAllowWhenCoordinatesFormSquare() {
+        List<Kebun.Point> points = List.of(
+                new Kebun.Point(0, 0),
+                new Kebun.Point(0, 2),
+                new Kebun.Point(2, 2),
+                new Kebun.Point(2, 0)
+        );
+
+        assertDoesNotThrow(() -> Kebun.builder()
+                .name("Kebun Sawit G")
+                .code("KBNG07")
+                .luas(70.0)
+                .coordinates(points)
+                .build());
+    }
 }
