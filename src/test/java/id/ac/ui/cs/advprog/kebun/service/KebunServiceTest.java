@@ -3,11 +3,12 @@ package id.ac.ui.cs.advprog.kebun.service;
 import id.ac.ui.cs.advprog.kebun.model.Kebun;
 import id.ac.ui.cs.advprog.kebun.repository.KebunRepository;
 import id.ac.ui.cs.advprog.kebun.validation.OverlapValidator;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.kafka.core.KafkaTemplate;
 
 import java.util.List;
 import java.util.Optional;
@@ -30,8 +31,15 @@ class KebunServiceTest {
     @Mock
     private OverlapValidator overlapValidator;
 
-    @InjectMocks
+    @Mock
+    private KafkaTemplate<String, Object> kafkaTemplate;
+
     private KebunService kebunService;
+
+    @BeforeEach
+    void setUp() {
+        kebunService = new KebunService(kebunRepository, overlapValidator, kafkaTemplate, "mandor-assigned");
+    }
 
     @Test
     void createShouldValidateOverlapAndPersistKebun() {
@@ -147,5 +155,46 @@ class KebunServiceTest {
         kebunService.delete("KBNA01");
 
         verify(kebunRepository, times(1)).deleteByCode("KBNA01");
+    }
+
+    @Test
+    void assignMandorShouldPersistAssignmentWhenKebunExists() {
+        Kebun existing = Kebun.builder()
+                .name("Kebun Sawit A")
+                .code("KBNA01")
+                .luas(100.0)
+                .build();
+
+        when(kebunRepository.findByCode("KBNA01")).thenReturn(Optional.of(existing));
+
+        kebunService.assignMandor("KBNA01", "mandor-123");
+
+        verify(kebunRepository, times(1)).assignMandor("KBNA01", "mandor-123");
+    }
+
+    @Test
+    void assignMandorShouldThrowWhenKebunNotFound() {
+        when(kebunRepository.findByCode("UNKNOWN")).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> kebunService.assignMandor("UNKNOWN", "mandor-123"));
+
+        verify(kebunRepository, never()).assignMandor(any(), any());
+    }
+
+    @Test
+    void unassignMandorShouldThrowWhenNoReplacementProvided() {
+        assertThrows(IllegalArgumentException.class,
+                () -> kebunService.unassignMandor("KBNA01", "mandor-123", null));
+
+        verify(kebunRepository, never()).unassignMandor(any(), any());
+    }
+
+    @Test
+    void unassignMandorShouldPersistWhenReplacementProvided() {
+        kebunService.unassignMandor("KBNA01", "mandor-123", "mandor-456");
+
+        verify(kebunRepository, times(1)).unassignMandor("KBNA01", "mandor-123");
+        verify(kebunRepository, times(1)).assignMandor("KBNA01", "mandor-456");
     }
 }
