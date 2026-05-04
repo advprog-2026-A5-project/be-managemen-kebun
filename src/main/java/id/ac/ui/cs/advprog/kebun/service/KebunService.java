@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Service
 public class KebunService {
@@ -18,6 +19,7 @@ public class KebunService {
     private final OverlapValidator overlapValidator;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final String mandorAssignedTopic;
+    private final ReentrantLock writeLock = new ReentrantLock(true);
 
     public KebunService(KebunRepository kebunRepository,
                         OverlapValidator overlapValidator,
@@ -30,8 +32,13 @@ public class KebunService {
     }
 
     public Kebun create(Kebun kebun) {
-        overlapValidator.validateNoOverlap(kebun.getCoordinates());
-        return kebunRepository.save(kebun);
+        writeLock.lock();
+        try {
+            overlapValidator.validateNoOverlap(kebun.getCoordinates());
+            return kebunRepository.save(kebun);
+        } finally {
+            writeLock.unlock();
+        }
     }
 
     public Optional<Kebun> getByCode(String code) {
@@ -43,14 +50,19 @@ public class KebunService {
     }
 
     public Kebun update(String code, Kebun updateRequest) {
-        Kebun existing = kebunRepository.findByCode(code)
-                .orElseThrow(() -> new IllegalArgumentException("Kebun not found with code: " + code));
+        writeLock.lock();
+        try {
+            Kebun existing = kebunRepository.findByCode(code)
+                    .orElseThrow(() -> new IllegalArgumentException("Kebun not found with code: " + code));
 
-        if (!existing.getCode().equals(updateRequest.getCode())) {
-            throw new IllegalArgumentException("Kebun code is immutable and cannot be changed");
+            if (!existing.getCode().equals(updateRequest.getCode())) {
+                throw new IllegalArgumentException("Kebun code is immutable and cannot be changed");
+            }
+
+            return kebunRepository.save(updateRequest);
+        } finally {
+            writeLock.unlock();
         }
-
-        return kebunRepository.save(updateRequest);
     }
 
     public void delete(String code) {
