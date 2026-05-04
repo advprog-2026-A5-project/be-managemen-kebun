@@ -31,4 +31,15 @@ public class KebunService {
     public List<Kebun> findByName(String name) {
         return kebunRepository.findByNameContainingIgnoreCase(name);
     }
+
+    public Kebun update(String code, Kebun updateRequest) {
+        Kebun existing = kebunRepository.findByCode(code)
+                .orElseThrow(() -> new IllegalArgumentException("Kebun not found with code: " + code));
+
+        if (!existing.getCode().equals(updateRequest.getCode())) {
+            throw new IllegalArgumentException("Kebun code is immutable and cannot be changed");
+        }
+
+        return kebunRepository.save(updateRequest);
+    }
 }
