@@ -3,11 +3,10 @@ package id.ac.ui.cs.advprog.kebun.service;
 import id.ac.ui.cs.advprog.kebun.model.Kebun;
 import id.ac.ui.cs.advprog.kebun.repository.KebunRepository;
 import id.ac.ui.cs.advprog.kebun.validation.OverlapValidator;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;`r`nimport org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoExtension;`r`nimport org.springframework.kafka.core.KafkaTemplate;
 
 import java.util.List;
 import java.util.Optional;
@@ -30,8 +29,7 @@ class KebunServiceTest {
     @Mock
     private OverlapValidator overlapValidator;
 
-    @InjectMocks
-    private KebunService kebunService;
+    @Mock`r`n    private KafkaTemplate<String, Object> kafkaTemplate;`r`n`r`n    private KebunService kebunService;`r`n`r`n    @BeforeEach`r`n    void setUp() {`r`n        kebunService = new KebunService(kebunRepository, overlapValidator, kafkaTemplate, "mandor-assigned");`r`n    }
 
     @Test
     void createShouldValidateOverlapAndPersistKebun() {
@@ -190,3 +188,4 @@ class KebunServiceTest {
         verify(kebunRepository, times(1)).assignMandor("KBNA01", "mandor-456");
     }
 }
+
