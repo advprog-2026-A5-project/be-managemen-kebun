@@ -42,4 +42,11 @@ public class KebunService {
 
         return kebunRepository.save(updateRequest);
     }
+
+    public void delete(String code) {
+        if (kebunRepository.existsActiveMandorByKebunCode(code)) {
+            throw new IllegalStateException("Cannot delete kebun with active mandor");
+        }
+        kebunRepository.deleteByCode(code);
+    }
 }

@@ -14,4 +14,8 @@ public interface KebunRepository {
     Optional<Kebun> findByCode(String code);
 
     List<Kebun> findByNameContainingIgnoreCase(String name);
+
+    boolean existsActiveMandorByKebunCode(String code);
+
+    void deleteByCode(String code);
 }
