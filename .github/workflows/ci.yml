@@ -46,16 +46,17 @@ jobs:
           [ -n "${{ secrets.SONAR_TOKEN }}" ] || (echo "SONAR_TOKEN is missing" && exit 1)
           [ -n "${{ secrets.SONAR_PROJECT_KEY }}" ] || (echo "SONAR_PROJECT_KEY is missing" && exit 1)
 
-      - name: SonarCloud analysis
+      - name: SonarCloud scan
+        uses: SonarSource/sonarqube-scan-action@v4
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
-        run: |
-          gradle sonar \
-            -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-            -Dsonar.host.url=https://sonarcloud.io \
-            -Dsonar.organization=mysawit \
-            --no-daemon
+        with:
+          args: >
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
+            -Dsonar.organization=mysawit
+            -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.sources=src/main/java
+            -Dsonar.tests=src/test/java
 
   deploy-aws:
     name: CD Deploy to AWS Learner Lab
