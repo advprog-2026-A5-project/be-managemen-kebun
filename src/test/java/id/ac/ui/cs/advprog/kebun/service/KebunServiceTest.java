@@ -9,6 +9,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -292,6 +294,16 @@ class KebunServiceTest {
         executor.shutdownNow();
 
         org.junit.jupiter.api.Assertions.assertEquals(1, maxConcurrentInSave.get());
+    }
+
+    @Test
+    void createShouldUseSerializableTransactionIsolation() throws NoSuchMethodException {
+        Transactional transactional = KebunService.class
+                .getMethod("create", Kebun.class)
+                .getAnnotation(Transactional.class);
+
+        org.junit.jupiter.api.Assertions.assertNotNull(transactional);
+        assertEquals(Isolation.SERIALIZABLE, transactional.isolation());
     }
 }
 
