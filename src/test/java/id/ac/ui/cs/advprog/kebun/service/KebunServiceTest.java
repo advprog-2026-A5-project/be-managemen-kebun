@@ -305,5 +305,15 @@ class KebunServiceTest {
         org.junit.jupiter.api.Assertions.assertNotNull(transactional);
         assertEquals(Isolation.SERIALIZABLE, transactional.isolation());
     }
+
+    @Test
+    void updateShouldUseSerializableTransactionIsolation() throws NoSuchMethodException {
+        Transactional transactional = KebunService.class
+                .getMethod("update", String.class, Kebun.class)
+                .getAnnotation(Transactional.class);
+
+        org.junit.jupiter.api.Assertions.assertNotNull(transactional);
+        assertEquals(Isolation.SERIALIZABLE, transactional.isolation());
+    }
 }
 
