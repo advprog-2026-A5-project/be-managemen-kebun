@@ -54,6 +54,7 @@ public class KebunService {
         return kebunRepository.findByNameContainingIgnoreCase(name);
     }
 
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public Kebun update(String code, Kebun updateRequest) {
         return executeWithGlobalWriteLock(() -> {
             Kebun existing = requireKebunByCode(code);
