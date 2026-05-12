@@ -21,6 +21,7 @@ import java.util.Optional;
 public class PostgresKebunRepository implements KebunRepository {
 
     private static final TypeReference<List<Kebun.Point>> POINTS_TYPE = new TypeReference<>() {};
+    private static final long KEBUN_WRITE_LOCK_KEY = 0x4B4542554EL;
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
@@ -30,6 +31,11 @@ public class PostgresKebunRepository implements KebunRepository {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
         initializeSchema();
+    }
+
+    @Override
+    public void acquireGlobalWriteLock() {
+        jdbcTemplate.query("SELECT pg_advisory_xact_lock(?)", rs -> { }, KEBUN_WRITE_LOCK_KEY);
     }
 
     @Override

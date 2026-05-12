@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface KebunRepository {
+    void acquireGlobalWriteLock();
+
     boolean existsIntersecting(Polygon polygon);
 
     Kebun save(Kebun kebun);

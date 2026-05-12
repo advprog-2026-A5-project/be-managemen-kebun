@@ -7,6 +7,8 @@ import id.ac.ui.cs.advprog.kebun.validation.OverlapValidator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -36,8 +38,9 @@ public class KebunService {
         this.mandorAssignedTopic = mandorAssignedTopic;
     }
 
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public Kebun create(Kebun kebun) {
-        return executeWithWriteLock(() -> {
+        return executeWithGlobalWriteLock(() -> {
             overlapValidator.validateNoOverlap(kebun.getCoordinates());
             return kebunRepository.save(kebun);
         });
@@ -51,8 +54,9 @@ public class KebunService {
         return kebunRepository.findByNameContainingIgnoreCase(name);
     }
 
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public Kebun update(String code, Kebun updateRequest) {
-        return executeWithWriteLock(() -> {
+        return executeWithGlobalWriteLock(() -> {
             Kebun existing = requireKebunByCode(code);
 
             if (!existing.getCode().equals(updateRequest.getCode())) {
@@ -97,5 +101,12 @@ public class KebunService {
         } finally {
             writeLock.unlock();
         }
+    }
+
+    private <T> T executeWithGlobalWriteLock(Supplier<T> action) {
+        return executeWithWriteLock(() -> {
+            kebunRepository.acquireGlobalWriteLock();
+            return action.get();
+        });
     }
 }
