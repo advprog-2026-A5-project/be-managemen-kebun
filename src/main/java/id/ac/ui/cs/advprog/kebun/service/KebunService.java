@@ -38,6 +38,7 @@ public class KebunService {
 
     public Kebun create(Kebun kebun) {
         return executeWithWriteLock(() -> {
+            kebunRepository.acquireGlobalWriteLock();
             overlapValidator.validateNoOverlap(kebun.getCoordinates());
             return kebunRepository.save(kebun);
         });
