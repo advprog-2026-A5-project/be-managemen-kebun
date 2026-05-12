@@ -7,6 +7,8 @@ import id.ac.ui.cs.advprog.kebun.validation.OverlapValidator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +38,7 @@ public class KebunService {
         this.mandorAssignedTopic = mandorAssignedTopic;
     }
 
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public Kebun create(Kebun kebun) {
         return executeWithGlobalWriteLock(() -> {
             overlapValidator.validateNoOverlap(kebun.getCoordinates());
