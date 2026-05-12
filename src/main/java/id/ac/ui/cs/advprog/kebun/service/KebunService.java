@@ -54,6 +54,7 @@ public class KebunService {
 
     public Kebun update(String code, Kebun updateRequest) {
         return executeWithWriteLock(() -> {
+            kebunRepository.acquireGlobalWriteLock();
             Kebun existing = requireKebunByCode(code);
 
             if (!existing.getCode().equals(updateRequest.getCode())) {
