@@ -184,3 +184,59 @@ Future architecture membantu mengurangi risiko dengan beberapa cara:
 Arsitektur future menjadi lebih kompleks. Jumlah service bertambah, deployment lebih sulit, dan observability menjadi lebih penting. Tim juga harus lebih disiplin dalam membuat kontrak API dan event agar service tidak saling bergantung secara sembarangan.
 
 Namun, trade-off ini masuk akal karena MySawit punya banyak alur bisnis yang saling terhubung. Kalau semuanya tetap dibuat terlalu sederhana, sistem akan sulit berkembang ketika jumlah data, user, dan transaksi bertambah.
+
+# 4. Individual: Manajemen Kebun Sawit
+
+Modul ini bertanggung jawab untuk mengelola data kebun yang dimiliki BurhanSawit, termasuk membuat kebun baru, melihat daftar kebun, mengubah data kebun, menghapus kebun, validasi koordinat, validasi overlap, assignment Mandor, dan assignment Supir Truk.
+
+Berdasarkan requirement MySawit, setiap kebun memiliki nama kebun, kode unik kebun, luas dalam hektare, dan empat titik koordinat dalam bentuk latitude dan longitude. Kebun juga harus berbentuk persegi dan tidak boleh overlap dengan kebun lain. Selain itu, Admin Utama dapat menugaskan Mandor dan Supir Truk ke kebun.
+
+Secara arsitektur, modul ini penting karena data kebun menjadi data master yang dipakai oleh modul lain. Mandor dan Supir hanya dapat menjalankan beberapa aksi jika sudah ditempatkan pada kebun tertentu. Karena itu, integritas data kebun dan assignment harus dijaga.
+
+## 4.2 Individual Container Diagram
+
+![Individual Kebun Container Diagram](docs/architecture/images/individual-kebun-container.png)
+
+Container diagram ini memperlihatkan bagaimana Kebun Service berinteraksi dengan pengguna, database, Kafka, dan service lain. Admin Utama menggunakan Kebun Service untuk CRUD kebun dan assignment. Mandor dan Supir menggunakan data assignment untuk mengetahui kebun tempat mereka bekerja.
+
+Kebun Service menggunakan PostgreSQL/PostGIS untuk menyimpan data kebun dan melakukan validasi spasial. Kafka digunakan untuk publish event ketika terjadi assignment, sehingga modul lain seperti Notification atau Shipping dapat bereaksi tanpa harus membaca database Kebun secara langsung.
+
+## 4.3 Individual Component Diagram
+
+![Individual Kebun Component Diagram](docs/architecture/images/individual-kebun-component.png)
+
+Component diagram ini memperlihatkan struktur internal service kebun. KebunController menerima request HTTP. KebunService menjalankan business logic. OverlapValidatorImpl menangani validasi overlap dan koordinat. GeometryMapper mengubah koordinat latitude/longitude menjadi bentuk polygon yang bisa diproses oleh PostGIS. KebunRepository dan PostgresKebunRepository menangani akses database. KafkaTemplate digunakan untuk publish event assignment.
+
+Pemisahan ini penting supaya setiap komponen punya tanggung jawab yang jelas. Controller tidak langsung mengakses database, dan logic validasi tidak dicampur dengan logic HTTP.
+
+## 4.4 Code Diagram 1 - Create Kebun and Overlap Validation
+
+![Code Diagram 1 - Create Kebun and Overlap Validation](docs/architecture/images/code-create-kebun-overlap.png)
+
+Diagram ini dipilih karena create kebun adalah salah satu flow paling penting dalam modul kebun. Saat Admin membuat kebun, sistem harus memvalidasi bahwa koordinat tidak kosong, jumlah titik sesuai, bentuk kebun valid, dan area kebun tidak overlap dengan kebun lain.
+
+Flow ini juga menunjukkan kenapa PostgreSQL/PostGIS penting. Validasi overlap tidak cukup hanya dilihat sebagai validasi biasa, karena data koordinat harus dicek terhadap data kebun yang sudah ada. Selain itu, karena sekarang sudah ada DB-level locking, flow ini juga lebih aman ketika ada beberapa request yang masuk bersamaan.
+
+## 4.5 Code Diagram 2 - Mandor Assignment Event Flow
+
+![Code Diagram 2 - Mandor Assignment Event Flow](docs/architecture/images/code-mandor-assignment-event.png)
+
+Diagram ini dipilih karena assignment Mandor adalah bagian penting dari integrasi MySawit. Mandor hanya bisa melakukan aksi tertentu jika sudah ditempatkan pada kebun. Karena itu, data assignment tidak hanya penting untuk modul kebun, tetapi juga untuk modul lain.
+
+Setelah assignment berhasil, Kebun Service menerbitkan event seperti MandorAssignedEvent ke Kafka. Dengan pendekatan ini, service lain dapat mengetahui perubahan assignment tanpa harus langsung membaca database Kebun. Ini membantu mengurangi coupling antarmodul.
+
+## 4.6 Code Diagram 3 - Kebun Domain and Repository Structure
+
+![Code Diagram 3 - Kebun Domain and Repository Structure](docs/architecture/images/code-kebun-domain-repository.png)
+
+Diagram ini dipilih karena menjelaskan struktur kode yang paling mewakili modul kebun. Di dalamnya terdapat entity Kebun, CoordinatePoint, KebunService, OverlapValidator, GeometryMapper, KebunRepository, dan PostgresKebunRepository.
+
+Struktur ini penting karena memperlihatkan bahwa domain logic, validasi spasial, dan akses database tidak dicampur dalam satu class. Dengan pemisahan seperti ini, kode lebih mudah diuji, lebih mudah dirawat, dan lebih aman untuk dikembangkan ke depannya.
+
+## 4.7 Individual Architecture Reflection
+
+Dari sisi individual work, modul Manajemen Kebun Sawit memiliki peran penting karena menjadi dasar dari banyak proses operasional MySawit. Data kebun dipakai untuk menentukan tempat kerja Mandor, Supir, dan alur pengiriman hasil panen. Jadi jika data kebun salah, dampaknya bisa menyebar ke modul lain.
+
+Hal yang paling penting dari modul ini adalah menjaga integritas data kebun. Validasi koordinat, validasi bentuk kebun, validasi overlap, dan assignment harus dibuat dengan jelas. DB-level locking juga menjadi keputusan yang penting karena membuat validasi overlap lebih aman saat ada request paralel.
+
+Secara arsitektur, modul ini lebih baik jika tetap fokus pada data kebun dan assignment saja. Modul lain sebaiknya tidak langsung membaca database Kebun, tetapi menggunakan API atau event yang sudah didefinisikan. Dengan cara ini, sistem lebih mudah dikembangkan oleh banyak anggota kelompok.
