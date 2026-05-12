@@ -76,6 +76,9 @@ jobs:
         run: ./gradlew clean test jacocoTestReport sonar --no-daemon
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+
 
   deploy-aws:
     name: Deploy to EC2

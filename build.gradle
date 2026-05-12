@@ -46,8 +46,8 @@ tasks.named('test') {
 sonar {
     properties {
         property "sonar.host.url", "https://sonarcloud.io"
-        property "sonar.organization", "<your-sonarcloud-org>"
-        property "sonar.projectKey", "<your-project-key>"
+        property "sonar.organization", System.getenv("SONAR_ORGANIZATION")
+        property "sonar.projectKey", System.getenv("SONAR_PROJECT_KEY")
         property "sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml"
     }
 }
