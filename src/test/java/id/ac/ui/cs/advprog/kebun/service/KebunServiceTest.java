@@ -61,6 +61,7 @@ class KebunServiceTest {
 
         Kebun created = kebunService.create(request);
 
+        verify(kebunRepository, times(1)).acquireGlobalWriteLock();
         verify(overlapValidator, times(1)).validateNoOverlap(points);
         verify(kebunRepository, times(1)).save(request);
         assertEquals("KBNA01", created.getCode());
