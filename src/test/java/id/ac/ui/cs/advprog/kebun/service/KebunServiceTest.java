@@ -136,6 +136,7 @@ class KebunServiceTest {
 
         Kebun updated = kebunService.update("KBNA01", updateRequest);
 
+        verify(kebunRepository, times(1)).acquireGlobalWriteLock();
         assertEquals("KBNA01", updated.getCode());
         assertEquals("Kebun Sawit A Updated", updated.getName());
         verify(kebunRepository, times(1)).save(updateRequest);
