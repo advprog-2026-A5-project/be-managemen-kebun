@@ -37,8 +37,7 @@ public class KebunService {
     }
 
     public Kebun create(Kebun kebun) {
-        return executeWithWriteLock(() -> {
-            kebunRepository.acquireGlobalWriteLock();
+        return executeWithGlobalWriteLock(() -> {
             overlapValidator.validateNoOverlap(kebun.getCoordinates());
             return kebunRepository.save(kebun);
         });
@@ -53,8 +52,7 @@ public class KebunService {
     }
 
     public Kebun update(String code, Kebun updateRequest) {
-        return executeWithWriteLock(() -> {
-            kebunRepository.acquireGlobalWriteLock();
+        return executeWithGlobalWriteLock(() -> {
             Kebun existing = requireKebunByCode(code);
 
             if (!existing.getCode().equals(updateRequest.getCode())) {
@@ -99,5 +97,12 @@ public class KebunService {
         } finally {
             writeLock.unlock();
         }
+    }
+
+    private <T> T executeWithGlobalWriteLock(Supplier<T> action) {
+        return executeWithWriteLock(() -> {
+            kebunRepository.acquireGlobalWriteLock();
+            return action.get();
+        });
     }
 }
