@@ -130,6 +130,26 @@ public class PostgresKebunRepository implements KebunRepository {
         jdbcTemplate.update("DELETE FROM kebun WHERE code = ?", code);
     }
 
+    @Override
+    public Optional<Kebun> findAssignedKebunByMandorId(String mandorId) {
+        try {
+            Kebun kebun = jdbcTemplate.queryForObject(
+                    """
+                    SELECT k.name, k.code, k.luas, k.coordinates_json
+                    FROM kebun k
+                    JOIN kebun_mandor km ON km.kebun_code = k.code
+                    WHERE km.mandor_id = ?
+                    LIMIT 1
+                    """,
+                    kebunRowMapper,
+                    mandorId
+            );
+            return Optional.ofNullable(kebun);
+        } catch (EmptyResultDataAccessException ex) {
+            return Optional.empty();
+        }
+    }
+
     private Kebun mapKebun(ResultSet rs, int rowNum) throws SQLException {
         return Kebun.builder()
                 .name(rs.getString("name"))

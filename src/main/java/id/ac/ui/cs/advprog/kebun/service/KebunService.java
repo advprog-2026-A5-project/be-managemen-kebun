@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.kebun.service;
 
+import id.ac.ui.cs.advprog.kebun.dto.MandorKebunAssignmentResponse;
 import id.ac.ui.cs.advprog.kebun.event.MandorAssignedEvent;
 import id.ac.ui.cs.advprog.kebun.model.Kebun;
 import id.ac.ui.cs.advprog.kebun.repository.KebunRepository;
@@ -87,6 +88,23 @@ public class KebunService {
 
         kebunRepository.unassignMandor(kebunCode, oldMandorId);
         kebunRepository.assignMandor(kebunCode, replacementMandorId);
+    }
+
+    public MandorKebunAssignmentResponse getMandorKebunAssignment(Long mandorId) {
+        Optional<Kebun> kebun = kebunRepository.findAssignedKebunByMandorId(String.valueOf(mandorId));
+
+        if (kebun.isEmpty()) {
+            return new MandorKebunAssignmentResponse(mandorId, null, null, null, false);
+        }
+
+        Kebun assignedKebun = kebun.get();
+        return new MandorKebunAssignmentResponse(
+                mandorId,
+                null,
+                assignedKebun.getCode(),
+                assignedKebun.getName(),
+                true
+        );
     }
 
     private Kebun requireKebunByCode(String code) {
