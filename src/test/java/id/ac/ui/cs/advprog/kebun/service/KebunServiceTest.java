@@ -315,5 +315,32 @@ class KebunServiceTest {
         org.junit.jupiter.api.Assertions.assertNotNull(transactional);
         assertEquals(Isolation.SERIALIZABLE, transactional.isolation());
     }
+
+    @Test
+    void getMandorKebunAssignmentShouldReturnActiveAssignment() {
+        Kebun kebun = Kebun.builder()
+                .name("Kebun A")
+                .code("KB001")
+                .luas(100.0)
+                .build();
+
+        when(kebunRepository.findAssignedKebunByMandorId("3")).thenReturn(Optional.of(kebun));
+
+        var result = kebunService.getMandorKebunAssignment(3L);
+
+        assertEquals(3L, result.mandorId());
+        assertEquals("KB001", result.kebunCode());
+        assertEquals(true, result.active());
+    }
+
+    @Test
+    void getMandorKebunAssignmentShouldReturnInactiveWhenMandorNotAssigned() {
+        when(kebunRepository.findAssignedKebunByMandorId("99")).thenReturn(Optional.empty());
+
+        var result = kebunService.getMandorKebunAssignment(99L);
+
+        assertEquals(99L, result.mandorId());
+        assertEquals(false, result.active());
+    }
 }
 
