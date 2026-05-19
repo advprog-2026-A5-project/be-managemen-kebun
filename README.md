@@ -240,3 +240,24 @@ Dari sisi individual work, modul Manajemen Kebun Sawit memiliki peran penting ka
 Hal yang paling penting dari modul ini adalah menjaga integritas data kebun. Validasi koordinat, validasi bentuk kebun, validasi overlap, dan assignment harus dibuat dengan jelas. DB-level locking juga menjadi keputusan yang penting karena membuat validasi overlap lebih aman saat ada request paralel.
 
 Secara arsitektur, modul ini lebih baik jika tetap fokus pada data kebun dan assignment saja. Modul lain sebaiknya tidak langsung membaca database Kebun, tetapi menggunakan API atau event yang sudah didefinisikan. Dengan cara ini, sistem lebih mudah dikembangkan oleh banyak anggota kelompok.
+
+## 5. Local Run (Integration Baseline)
+
+- Default port: `8081` (override with `SERVER_PORT`)
+- Required DB: PostgreSQL/PostGIS (default `localhost:5432`, db `kebun_db`)
+
+Run PostGIS dependency:
+
+```powershell
+docker compose up -d postgres
+```
+
+Run app:
+
+```powershell
+./gradlew bootRun
+```
+
+Internal integration endpoint used by sibling service:
+
+- `GET /internal/mandors/{mandorId}/kebun`
