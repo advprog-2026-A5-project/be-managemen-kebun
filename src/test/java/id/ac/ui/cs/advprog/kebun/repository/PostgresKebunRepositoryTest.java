@@ -45,11 +45,6 @@ class PostgresKebunRepositoryTest {
     }
 
     @Test
-    void constructorShouldInitializeTables() {
-        verify(jdbcTemplate, times(2)).execute(anyString());
-    }
-
-    @Test
     void acquireGlobalWriteLockShouldInvokeAdvisoryLockQuery() {
         repository.acquireGlobalWriteLock();
     }

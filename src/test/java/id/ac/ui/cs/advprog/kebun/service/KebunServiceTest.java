@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,13 +33,18 @@ class KebunServiceTest {
     private OverlapValidator overlapValidator;
 
     @Mock
-    private KafkaTemplate<String, Object> kafkaTemplate;
+    private MandorAssignmentEventPublisher mandorAssignmentEventPublisher;
 
     private KebunService kebunService;
 
     @BeforeEach
     void setUp() {
-        kebunService = new KebunService(kebunRepository, overlapValidator, kafkaTemplate, "mandor-assigned");
+        kebunService = new KebunService(
+                kebunRepository,
+                overlapValidator,
+                mandorAssignmentEventPublisher,
+                "mandor-assigned"
+        );
     }
 
     @Test
