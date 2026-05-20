@@ -42,7 +42,7 @@ class KebunServiceDomainEventPublicationTest {
 
         kebunService.assignMandor("KB001", "mandor-123");
 
-        verify(applicationEventPublisher).publishEvent(argThat(event ->
+        verify(applicationEventPublisher).publishEvent(argThat((Object event) ->
                 event instanceof MandorAssignedEvent
                         && "KB001".equals(((MandorAssignedEvent) event).getKebunCode())
                         && "mandor-123".equals(((MandorAssignedEvent) event).getMandorId())
