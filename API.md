@@ -61,6 +61,24 @@
 - Constraint:
   - delete is blocked if active mandor is still assigned.
 
+### 6. Get Mandor Kebun Assignment (Internal)
+- Method: `GET`
+- Path: `/internal/mandors/{mandorId}/kebun`
+- Success Response: `200 OK`
+- Response Body:
+```json
+{
+  "mandorId": 3,
+  "kebunId": null,
+  "kebunCode": "KB001",
+  "kebunName": "Kebun A",
+  "active": true
+}
+```
+- Behavior:
+  - if mandor is assigned to a kebun, `active=true` with kebun fields populated.
+  - if mandor is not assigned, `active=false` and kebun fields are `null`.
+
 ## Error Mapping
 Global exception mapping:
 - `IllegalArgumentException` -> `400 Bad Request`

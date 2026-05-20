@@ -21,6 +21,7 @@ import java.util.Optional;
 public class PostgresKebunRepository implements KebunRepository {
 
     private static final TypeReference<List<Kebun.Point>> POINTS_TYPE = new TypeReference<>() {};
+    private static final long KEBUN_WRITE_LOCK_KEY = 0x4B4542554EL;
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
@@ -29,7 +30,11 @@ public class PostgresKebunRepository implements KebunRepository {
     public PostgresKebunRepository(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
-        initializeSchema();
+    }
+
+    @Override
+    public void acquireGlobalWriteLock() {
+        jdbcTemplate.query("SELECT pg_advisory_xact_lock(?)", rs -> { }, KEBUN_WRITE_LOCK_KEY);
     }
 
     @Override
@@ -124,6 +129,26 @@ public class PostgresKebunRepository implements KebunRepository {
         jdbcTemplate.update("DELETE FROM kebun WHERE code = ?", code);
     }
 
+    @Override
+    public Optional<Kebun> findAssignedKebunByMandorId(String mandorId) {
+        try {
+            Kebun kebun = jdbcTemplate.queryForObject(
+                    """
+                    SELECT k.name, k.code, k.luas, k.coordinates_json
+                    FROM kebun k
+                    JOIN kebun_mandor km ON km.kebun_code = k.code
+                    WHERE km.mandor_id = ?
+                    LIMIT 1
+                    """,
+                    kebunRowMapper,
+                    mandorId
+            );
+            return Optional.ofNullable(kebun);
+        } catch (EmptyResultDataAccessException ex) {
+            return Optional.empty();
+        }
+    }
+
     private Kebun mapKebun(ResultSet rs, int rowNum) throws SQLException {
         return Kebun.builder()
                 .name(rs.getString("name"))
@@ -131,25 +156,6 @@ public class PostgresKebunRepository implements KebunRepository {
                 .luas(rs.getDouble("luas"))
                 .coordinates(fromJson(rs.getString("coordinates_json")))
                 .build();
-    }
-
-    private void initializeSchema() {
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS kebun (
-                    code VARCHAR(64) PRIMARY KEY,
-                    name VARCHAR(255) NOT NULL,
-                    luas DOUBLE PRECISION NOT NULL,
-                    coordinates_json TEXT NOT NULL
-                )
-                """);
-
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS kebun_mandor (
-                    kebun_code VARCHAR(64) NOT NULL REFERENCES kebun(code) ON DELETE CASCADE,
-                    mandor_id VARCHAR(128) NOT NULL,
-                    PRIMARY KEY (kebun_code, mandor_id)
-                )
-                """);
     }
 
     private String toJson(List<Kebun.Point> points) {

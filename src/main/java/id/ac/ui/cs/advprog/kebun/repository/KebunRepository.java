@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface KebunRepository {
+    void acquireGlobalWriteLock();
+
     boolean existsIntersecting(Polygon polygon);
 
     Kebun save(Kebun kebun);
@@ -22,4 +24,6 @@ public interface KebunRepository {
     void unassignMandor(String kebunCode, String mandorId);
 
     void deleteByCode(String code);
+
+    Optional<Kebun> findAssignedKebunByMandorId(String mandorId);
 }

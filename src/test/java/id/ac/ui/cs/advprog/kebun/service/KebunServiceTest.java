@@ -8,7 +8,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -32,13 +33,18 @@ class KebunServiceTest {
     private OverlapValidator overlapValidator;
 
     @Mock
-    private KafkaTemplate<String, Object> kafkaTemplate;
+    private MandorAssignmentEventPublisher mandorAssignmentEventPublisher;
 
     private KebunService kebunService;
 
     @BeforeEach
     void setUp() {
-        kebunService = new KebunService(kebunRepository, overlapValidator, kafkaTemplate, "mandor-assigned");
+        kebunService = new KebunService(
+                kebunRepository,
+                overlapValidator,
+                mandorAssignmentEventPublisher,
+                "mandor-assigned"
+        );
     }
 
     @Test
@@ -61,6 +67,7 @@ class KebunServiceTest {
 
         Kebun created = kebunService.create(request);
 
+        verify(kebunRepository, times(1)).acquireGlobalWriteLock();
         verify(overlapValidator, times(1)).validateNoOverlap(points);
         verify(kebunRepository, times(1)).save(request);
         assertEquals("KBNA01", created.getCode());
@@ -135,6 +142,7 @@ class KebunServiceTest {
 
         Kebun updated = kebunService.update("KBNA01", updateRequest);
 
+        verify(kebunRepository, times(1)).acquireGlobalWriteLock();
         assertEquals("KBNA01", updated.getCode());
         assertEquals("Kebun Sawit A Updated", updated.getName());
         verify(kebunRepository, times(1)).save(updateRequest);
@@ -290,6 +298,53 @@ class KebunServiceTest {
         executor.shutdownNow();
 
         org.junit.jupiter.api.Assertions.assertEquals(1, maxConcurrentInSave.get());
+    }
+
+    @Test
+    void createShouldUseSerializableTransactionIsolation() throws NoSuchMethodException {
+        Transactional transactional = KebunService.class
+                .getMethod("create", Kebun.class)
+                .getAnnotation(Transactional.class);
+
+        org.junit.jupiter.api.Assertions.assertNotNull(transactional);
+        assertEquals(Isolation.SERIALIZABLE, transactional.isolation());
+    }
+
+    @Test
+    void updateShouldUseSerializableTransactionIsolation() throws NoSuchMethodException {
+        Transactional transactional = KebunService.class
+                .getMethod("update", String.class, Kebun.class)
+                .getAnnotation(Transactional.class);
+
+        org.junit.jupiter.api.Assertions.assertNotNull(transactional);
+        assertEquals(Isolation.SERIALIZABLE, transactional.isolation());
+    }
+
+    @Test
+    void getMandorKebunAssignmentShouldReturnActiveAssignment() {
+        Kebun kebun = Kebun.builder()
+                .name("Kebun A")
+                .code("KB001")
+                .luas(100.0)
+                .build();
+
+        when(kebunRepository.findAssignedKebunByMandorId("3")).thenReturn(Optional.of(kebun));
+
+        var result = kebunService.getMandorKebunAssignment(3L);
+
+        assertEquals(3L, result.mandorId());
+        assertEquals("KB001", result.kebunCode());
+        assertEquals(true, result.active());
+    }
+
+    @Test
+    void getMandorKebunAssignmentShouldReturnInactiveWhenMandorNotAssigned() {
+        when(kebunRepository.findAssignedKebunByMandorId("99")).thenReturn(Optional.empty());
+
+        var result = kebunService.getMandorKebunAssignment(99L);
+
+        assertEquals(99L, result.mandorId());
+        assertEquals(false, result.active());
     }
 }
 
