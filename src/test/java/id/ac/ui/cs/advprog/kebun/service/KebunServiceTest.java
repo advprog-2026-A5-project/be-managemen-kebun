@@ -104,6 +104,17 @@ class KebunServiceTest {
     }
 
     @Test
+    void findByFiltersShouldDelegateToRepository() {
+        Kebun kebun = Kebun.builder().name("Kebun Sawit A").code("KBNA01").luas(100.0).build();
+        when(kebunRepository.findByNameAndCodeContainingIgnoreCase("Sawit", "A01")).thenReturn(List.of(kebun));
+
+        List<Kebun> result = kebunService.findByFilters("Sawit", "A01");
+
+        assertEquals(1, result.size());
+        verify(kebunRepository, times(1)).findByNameAndCodeContainingIgnoreCase("Sawit", "A01");
+    }
+
+    @Test
     void updateShouldThrowWhenCodeIsChanged() {
         Kebun existing = Kebun.builder()
                 .name("Kebun Sawit A")
@@ -193,6 +204,13 @@ class KebunServiceTest {
     }
 
     @Test
+    void assignMandorShouldThrowWhenMandorIdBlank() {
+        assertThrows(IllegalArgumentException.class,
+                () -> kebunService.assignMandor("KBNA01", " "));
+        verify(kebunRepository, never()).assignMandor(any(), any());
+    }
+
+    @Test
     void unassignMandorShouldThrowWhenNoReplacementProvided() {
         assertThrows(IllegalArgumentException.class,
                 () -> kebunService.unassignMandor("KBNA01", "mandor-123", null));
@@ -214,6 +232,90 @@ class KebunServiceTest {
         verify(kebunRepository, times(1)).unassignMandor("KBNA01", "mandor-123");
         verify(kebunRepository, times(1)).unassignMandorFromAnyKebun("mandor-456");
         verify(kebunRepository, times(1)).assignMandor("KBNA01", "mandor-456");
+    }
+
+    @Test
+    void reassignMandorShouldMoveMandorToReplacementKebun() {
+        Kebun current = Kebun.builder().name("Kebun A").code("KB001").luas(100.0).build();
+        Kebun replacement = Kebun.builder().name("Kebun B").code("KB002").luas(120.0).build();
+        when(kebunRepository.findByCode("KB001")).thenReturn(Optional.of(current));
+        when(kebunRepository.findByCode("KB002")).thenReturn(Optional.of(replacement));
+
+        kebunService.reassignMandorToAnotherKebun("KB001", "3", "KB002");
+
+        verify(kebunRepository).unassignMandor("KB001", "3");
+        verify(kebunRepository).unassignMandorFromAnyKebun("3");
+        verify(kebunRepository).unassignAnyMandorFromKebun("KB002");
+        verify(kebunRepository).assignMandor("KB002", "3");
+        verify(mandorAssignmentEventPublisher).publish("mandor-assigned", "KB002", "3");
+    }
+
+    @Test
+    void reassignMandorShouldThrowWhenReplacementMissing() {
+        assertThrows(IllegalArgumentException.class,
+                () -> kebunService.reassignMandorToAnotherKebun("KB001", "3", " "));
+    }
+
+    @Test
+    void assignSupirShouldPersistWhenInputsValid() {
+        Kebun kebun = Kebun.builder().name("Kebun A").code("KB001").luas(100.0).build();
+        when(kebunRepository.findByCode("KB001")).thenReturn(Optional.of(kebun));
+
+        kebunService.assignSupir("KB001", "11");
+
+        verify(kebunRepository).unassignSupirFromAnyKebun("11");
+        verify(kebunRepository).assignSupir("KB001", "11");
+    }
+
+    @Test
+    void assignSupirShouldThrowWhenSupirIdMissing() {
+        assertThrows(IllegalArgumentException.class, () -> kebunService.assignSupir("KB001", ""));
+        verify(kebunRepository, never()).assignSupir(any(), any());
+    }
+
+    @Test
+    void reassignSupirShouldMoveSupirToReplacementKebun() {
+        Kebun current = Kebun.builder().name("Kebun A").code("KB001").luas(100.0).build();
+        Kebun replacement = Kebun.builder().name("Kebun B").code("KB002").luas(120.0).build();
+        when(kebunRepository.findByCode("KB001")).thenReturn(Optional.of(current));
+        when(kebunRepository.findByCode("KB002")).thenReturn(Optional.of(replacement));
+
+        kebunService.reassignSupirToAnotherKebun("KB001", "11", "KB002");
+
+        verify(kebunRepository).unassignSupir("KB001", "11");
+        verify(kebunRepository).unassignSupirFromAnyKebun("11");
+        verify(kebunRepository).assignSupir("KB002", "11");
+    }
+
+    @Test
+    void reassignSupirShouldThrowWhenReplacementMissing() {
+        assertThrows(IllegalArgumentException.class,
+                () -> kebunService.reassignSupirToAnotherKebun("KB001", "11", " "));
+    }
+
+    @Test
+    void getKebunDetailByCodeShouldIncludeMandorAndSupirs() {
+        List<Kebun.Point> points = List.of(
+                new Kebun.Point(0, 0),
+                new Kebun.Point(0, 2),
+                new Kebun.Point(2, 2),
+                new Kebun.Point(2, 0)
+        );
+        Kebun kebun = Kebun.builder()
+                .name("Kebun A")
+                .code("KB001")
+                .luas(100.0)
+                .coordinates(points)
+                .build();
+        when(kebunRepository.findByCode("KB001")).thenReturn(Optional.of(kebun));
+        when(kebunRepository.findMandorIdByKebunCode("KB001")).thenReturn(Optional.of("3"));
+        when(kebunRepository.findSupirIdsByKebunCode("KB001")).thenReturn(List.of("11", "12"));
+
+        var detail = kebunService.getKebunDetailByCode("KB001");
+
+        assertEquals("KB001", detail.code());
+        assertEquals("3", detail.mandorId());
+        assertEquals(List.of("11", "12"), detail.supirIds());
     }
 
     @Test
