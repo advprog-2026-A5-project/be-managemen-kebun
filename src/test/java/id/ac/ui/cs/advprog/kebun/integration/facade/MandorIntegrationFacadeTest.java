@@ -2,6 +2,7 @@ package id.ac.ui.cs.advprog.kebun.integration.facade;
 
 import id.ac.ui.cs.advprog.kebun.event.MandorAssignedEvent;
 import id.ac.ui.cs.advprog.kebun.integration.client.HasilPanenClient;
+import id.ac.ui.cs.advprog.kebun.integration.dto.MandorAssignedRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -27,7 +28,7 @@ class MandorIntegrationFacadeTest {
 
         facade.notifyMandorAssigned(event);
 
-        verify(hasilPanenClient).notifyMandorAssigned(argThat(request ->
+        verify(hasilPanenClient).notifyMandorAssigned(argThat((MandorAssignedRequest request) ->
                 "KB001".equals(request.kebunCode()) && "mandor-123".equals(request.mandorId())
         ));
     }
