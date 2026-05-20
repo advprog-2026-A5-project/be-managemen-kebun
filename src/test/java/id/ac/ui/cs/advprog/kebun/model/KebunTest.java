@@ -119,4 +119,21 @@ class KebunTest {
                 .coordinates(points)
                 .build());
     }
+
+    @Test
+    void builderShouldRejectWhenCoordinatesContainDuplicatePoint() {
+        List<Kebun.Point> points = List.of(
+                new Kebun.Point(0, 0),
+                new Kebun.Point(0, 0),
+                new Kebun.Point(2, 2),
+                new Kebun.Point(2, 0)
+        );
+
+        assertThrows(IllegalArgumentException.class, () -> Kebun.builder()
+                .name("Kebun Sawit H")
+                .code("KBNH08")
+                .luas(70.0)
+                .coordinates(points)
+                .build());
+    }
 }
