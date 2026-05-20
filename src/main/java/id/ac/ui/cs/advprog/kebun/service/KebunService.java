@@ -2,10 +2,11 @@ package id.ac.ui.cs.advprog.kebun.service;
 
 import id.ac.ui.cs.advprog.kebun.dto.MandorKebunAssignmentResponse;
 import id.ac.ui.cs.advprog.kebun.dto.KebunDetailResponse;
+import id.ac.ui.cs.advprog.kebun.event.MandorAssignedEvent;
 import id.ac.ui.cs.advprog.kebun.model.Kebun;
 import id.ac.ui.cs.advprog.kebun.repository.KebunRepository;
 import id.ac.ui.cs.advprog.kebun.validation.OverlapValidator;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,18 +28,15 @@ public class KebunService {
 
     private final KebunRepository kebunRepository;
     private final OverlapValidator overlapValidator;
-    private final MandorAssignmentEventPublisher mandorAssignmentEventPublisher;
-    private final String mandorAssignedTopic;
+    private final ApplicationEventPublisher applicationEventPublisher;
     private final ReentrantLock writeLock = new ReentrantLock(true);
 
     public KebunService(KebunRepository kebunRepository,
                         OverlapValidator overlapValidator,
-                        MandorAssignmentEventPublisher mandorAssignmentEventPublisher,
-                        @Value("${app.kafka.topic.mandor-assigned}") String mandorAssignedTopic) {
+                        ApplicationEventPublisher applicationEventPublisher) {
         this.kebunRepository = kebunRepository;
         this.overlapValidator = overlapValidator;
-        this.mandorAssignmentEventPublisher = mandorAssignmentEventPublisher;
-        this.mandorAssignedTopic = mandorAssignedTopic;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
@@ -89,7 +87,7 @@ public class KebunService {
         kebunRepository.unassignMandorFromAnyKebun(mandorId);
         kebunRepository.unassignAnyMandorFromKebun(kebunCode);
         kebunRepository.assignMandor(kebunCode, mandorId);
-        mandorAssignmentEventPublisher.publish(mandorAssignedTopic, kebunCode, mandorId);
+        applicationEventPublisher.publishEvent(new MandorAssignedEvent(kebunCode, mandorId));
     }
 
     @Transactional
@@ -102,7 +100,7 @@ public class KebunService {
         kebunRepository.unassignMandor(kebunCode, oldMandorId);
         kebunRepository.unassignMandorFromAnyKebun(replacementMandorId);
         kebunRepository.assignMandor(kebunCode, replacementMandorId);
-        mandorAssignmentEventPublisher.publish(mandorAssignedTopic, kebunCode, replacementMandorId);
+        applicationEventPublisher.publishEvent(new MandorAssignedEvent(kebunCode, replacementMandorId));
     }
 
     @Transactional
@@ -121,7 +119,7 @@ public class KebunService {
         kebunRepository.unassignMandorFromAnyKebun(mandorId);
         kebunRepository.unassignAnyMandorFromKebun(replacementKebunCode);
         kebunRepository.assignMandor(replacementKebunCode, mandorId);
-        mandorAssignmentEventPublisher.publish(mandorAssignedTopic, replacementKebunCode, mandorId);
+        applicationEventPublisher.publishEvent(new MandorAssignedEvent(replacementKebunCode, mandorId));
     }
 
     @Transactional

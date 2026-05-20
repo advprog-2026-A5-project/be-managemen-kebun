@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -33,7 +35,7 @@ class KebunServiceTest {
     private OverlapValidator overlapValidator;
 
     @Mock
-    private MandorAssignmentEventPublisher mandorAssignmentEventPublisher;
+    private ApplicationEventPublisher applicationEventPublisher;
 
     private KebunService kebunService;
 
@@ -42,8 +44,7 @@ class KebunServiceTest {
         kebunService = new KebunService(
                 kebunRepository,
                 overlapValidator,
-                mandorAssignmentEventPublisher,
-                "mandor-assigned"
+                applicationEventPublisher
         );
     }
 
@@ -247,7 +248,11 @@ class KebunServiceTest {
         verify(kebunRepository).unassignMandorFromAnyKebun("3");
         verify(kebunRepository).unassignAnyMandorFromKebun("KB002");
         verify(kebunRepository).assignMandor("KB002", "3");
-        verify(mandorAssignmentEventPublisher).publish("mandor-assigned", "KB002", "3");
+        verify(applicationEventPublisher).publishEvent(argThat((Object event) ->
+                event instanceof id.ac.ui.cs.advprog.kebun.event.MandorAssignedEvent
+                        && "KB002".equals(((id.ac.ui.cs.advprog.kebun.event.MandorAssignedEvent) event).getKebunCode())
+                        && "3".equals(((id.ac.ui.cs.advprog.kebun.event.MandorAssignedEvent) event).getMandorId())
+        ));
     }
 
     @Test
