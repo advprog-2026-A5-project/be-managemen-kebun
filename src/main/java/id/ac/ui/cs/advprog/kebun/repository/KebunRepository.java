@@ -17,11 +17,27 @@ public interface KebunRepository {
 
     List<Kebun> findByNameContainingIgnoreCase(String name);
 
+    List<Kebun> findByNameAndCodeContainingIgnoreCase(String name, String code);
+
     boolean existsActiveMandorByKebunCode(String code);
 
     void assignMandor(String kebunCode, String mandorId);
 
     void unassignMandor(String kebunCode, String mandorId);
+
+    void unassignMandorFromAnyKebun(String mandorId);
+
+    void unassignAnyMandorFromKebun(String kebunCode);
+
+    Optional<String> findMandorIdByKebunCode(String kebunCode);
+
+    List<String> findSupirIdsByKebunCode(String kebunCode);
+
+    void assignSupir(String kebunCode, String supirId);
+
+    void unassignSupir(String kebunCode, String supirId);
+
+    void unassignSupirFromAnyKebun(String supirId);
 
     void deleteByCode(String code);
 

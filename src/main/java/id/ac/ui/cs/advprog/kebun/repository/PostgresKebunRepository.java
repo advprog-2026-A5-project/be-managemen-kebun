@@ -97,6 +97,24 @@ public class PostgresKebunRepository implements KebunRepository {
     }
 
     @Override
+    public List<Kebun> findByNameAndCodeContainingIgnoreCase(String name, String code) {
+        String nameKeyword = name == null ? "" : name;
+        String codeKeyword = code == null ? "" : code;
+        return jdbcTemplate.query(
+                """
+                SELECT name, code, luas, coordinates_json
+                FROM kebun
+                WHERE LOWER(name) LIKE LOWER(?)
+                  AND LOWER(code) LIKE LOWER(?)
+                ORDER BY code ASC
+                """,
+                kebunRowMapper,
+                "%" + nameKeyword + "%",
+                "%" + codeKeyword + "%"
+        );
+    }
+
+    @Override
     public boolean existsActiveMandorByKebunCode(String code) {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM kebun_mandor WHERE kebun_code = ?",
@@ -122,6 +140,62 @@ public class PostgresKebunRepository implements KebunRepository {
                 kebunCode,
                 mandorId
         );
+    }
+
+    @Override
+    public void unassignMandorFromAnyKebun(String mandorId) {
+        jdbcTemplate.update("DELETE FROM kebun_mandor WHERE mandor_id = ?", mandorId);
+    }
+
+    @Override
+    public void unassignAnyMandorFromKebun(String kebunCode) {
+        jdbcTemplate.update("DELETE FROM kebun_mandor WHERE kebun_code = ?", kebunCode);
+    }
+
+    @Override
+    public Optional<String> findMandorIdByKebunCode(String kebunCode) {
+        try {
+            String mandorId = jdbcTemplate.queryForObject(
+                    "SELECT mandor_id FROM kebun_mandor WHERE kebun_code = ? LIMIT 1",
+                    String.class,
+                    kebunCode
+            );
+            return Optional.ofNullable(mandorId);
+        } catch (EmptyResultDataAccessException ex) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public List<String> findSupirIdsByKebunCode(String kebunCode) {
+        return jdbcTemplate.queryForList(
+                "SELECT supir_id FROM kebun_supir WHERE kebun_code = ? ORDER BY supir_id ASC",
+                String.class,
+                kebunCode
+        );
+    }
+
+    @Override
+    public void assignSupir(String kebunCode, String supirId) {
+        jdbcTemplate.update(
+                "INSERT INTO kebun_supir (kebun_code, supir_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+                kebunCode,
+                supirId
+        );
+    }
+
+    @Override
+    public void unassignSupir(String kebunCode, String supirId) {
+        jdbcTemplate.update(
+                "DELETE FROM kebun_supir WHERE kebun_code = ? AND supir_id = ?",
+                kebunCode,
+                supirId
+        );
+    }
+
+    @Override
+    public void unassignSupirFromAnyKebun(String supirId) {
+        jdbcTemplate.update("DELETE FROM kebun_supir WHERE supir_id = ?", supirId);
     }
 
     @Override

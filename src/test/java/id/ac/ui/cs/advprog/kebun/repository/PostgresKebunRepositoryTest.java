@@ -195,6 +195,29 @@ class PostgresKebunRepositoryTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void findByNameAndCodeShouldDelegateCombinedLikeQuery() {
+        Kebun kebun = Kebun.builder()
+                .name("Sawit")
+                .code("KBNA01")
+                .luas(1.0)
+                .coordinates(List.of(
+                        new Kebun.Point(0, 0),
+                        new Kebun.Point(0, 1),
+                        new Kebun.Point(1, 1),
+                        new Kebun.Point(1, 0)
+                ))
+                .build();
+        doReturn(List.of(kebun))
+                .when(jdbcTemplate)
+                .query(anyString(), any(RowMapper.class), eq("%saw%"), eq("%na0%"));
+
+        List<Kebun> result = repository.findByNameAndCodeContainingIgnoreCase("saw", "na0");
+
+        assertEquals(1, result.size());
+    }
+
+    @Test
     void existsActiveMandorShouldReturnTrueWhenCountPositive() {
         when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("KBNA01"))).thenReturn(1);
 
@@ -220,6 +243,66 @@ class PostgresKebunRepositoryTest {
     void unassignMandorShouldDeleteRelationship() {
         repository.unassignMandor("KBNA01", "M1");
         verify(jdbcTemplate).update(anyString(), eq("KBNA01"), eq("M1"));
+    }
+
+    @Test
+    void unassignMandorFromAnyKebunShouldDeleteByMandorId() {
+        repository.unassignMandorFromAnyKebun("M1");
+        verify(jdbcTemplate).update(anyString(), eq("M1"));
+    }
+
+    @Test
+    void unassignAnyMandorFromKebunShouldDeleteByKebunCode() {
+        repository.unassignAnyMandorFromKebun("KBNA01");
+        verify(jdbcTemplate).update(anyString(), eq("KBNA01"));
+    }
+
+    @Test
+    void findMandorIdByKebunCodeShouldReturnValueWhenExists() {
+        when(jdbcTemplate.queryForObject(anyString(), eq(String.class), eq("KBNA01"))).thenReturn("M1");
+
+        Optional<String> result = repository.findMandorIdByKebunCode("KBNA01");
+
+        assertTrue(result.isPresent());
+        assertEquals("M1", result.get());
+    }
+
+    @Test
+    void findMandorIdByKebunCodeShouldReturnEmptyWhenNoResult() {
+        when(jdbcTemplate.queryForObject(anyString(), eq(String.class), eq("KBNA01")))
+                .thenThrow(new EmptyResultDataAccessException(1));
+
+        Optional<String> result = repository.findMandorIdByKebunCode("KBNA01");
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void findSupirIdsByKebunCodeShouldReturnRows() {
+        when(jdbcTemplate.queryForList(anyString(), eq(String.class), eq("KBNA01")))
+                .thenReturn(List.of("11", "12"));
+
+        List<String> result = repository.findSupirIdsByKebunCode("KBNA01");
+
+        assertEquals(List.of("11", "12"), result);
+    }
+
+    @Test
+    void assignSupirShouldInsertRelationship() {
+        repository.assignSupir("KBNA01", "11");
+        verify(jdbcTemplate).update(anyString(), eq("KBNA01"), eq("11"));
+    }
+
+    @Test
+    void unassignSupirShouldDeleteRelationship() {
+        repository.unassignSupir("KBNA01", "11");
+        verify(jdbcTemplate).update(anyString(), eq("KBNA01"), eq("11"));
+    }
+
+    @Test
+    void unassignSupirFromAnyKebunShouldDeleteBySupirId() {
+        repository.unassignSupirFromAnyKebun("11");
+        verify(jdbcTemplate).update(anyString(), eq("11"));
     }
 
     @Test

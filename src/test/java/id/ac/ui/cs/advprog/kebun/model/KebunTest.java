@@ -87,15 +87,15 @@ class KebunTest {
     }
 
     @Test
-    void builderShouldRejectWhenCoordinatesDoNotFormSquare() {
+    void builderShouldAllowWhenCoordinatesFormValidNonSquareQuadrilateral() {
         List<Kebun.Point> points = List.of(
                 new Kebun.Point(0, 0),
-                new Kebun.Point(0, 2),
-                new Kebun.Point(1, 2),
-                new Kebun.Point(1, 0)
+                new Kebun.Point(0, 3),
+                new Kebun.Point(2, 2),
+                new Kebun.Point(3, 0)
         );
 
-        assertThrows(IllegalArgumentException.class, () -> Kebun.builder()
+        assertDoesNotThrow(() -> Kebun.builder()
                 .name("Kebun Sawit F")
                 .code("KBNF06")
                 .luas(60.0)
@@ -104,17 +104,34 @@ class KebunTest {
     }
 
     @Test
-    void builderShouldAllowWhenCoordinatesFormSquare() {
+    void builderShouldRejectWhenCoordinatesDoNotFormValidQuadrilateral() {
         List<Kebun.Point> points = List.of(
                 new Kebun.Point(0, 0),
                 new Kebun.Point(0, 2),
+                new Kebun.Point(0, 4),
+                new Kebun.Point(2, 0)
+        );
+
+        assertThrows(IllegalArgumentException.class, () -> Kebun.builder()
+                .name("Kebun Sawit G")
+                .code("KBNG07")
+                .luas(70.0)
+                .coordinates(points)
+                .build());
+    }
+
+    @Test
+    void builderShouldRejectWhenCoordinatesContainDuplicatePoint() {
+        List<Kebun.Point> points = List.of(
+                new Kebun.Point(0, 0),
+                new Kebun.Point(0, 0),
                 new Kebun.Point(2, 2),
                 new Kebun.Point(2, 0)
         );
 
-        assertDoesNotThrow(() -> Kebun.builder()
-                .name("Kebun Sawit G")
-                .code("KBNG07")
+        assertThrows(IllegalArgumentException.class, () -> Kebun.builder()
+                .name("Kebun Sawit H")
+                .code("KBNH08")
                 .luas(70.0)
                 .coordinates(points)
                 .build());

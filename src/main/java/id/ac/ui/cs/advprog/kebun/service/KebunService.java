@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.kebun.service;
 
 import id.ac.ui.cs.advprog.kebun.dto.MandorKebunAssignmentResponse;
+import id.ac.ui.cs.advprog.kebun.dto.KebunDetailResponse;
 import id.ac.ui.cs.advprog.kebun.model.Kebun;
 import id.ac.ui.cs.advprog.kebun.repository.KebunRepository;
 import id.ac.ui.cs.advprog.kebun.validation.OverlapValidator;
@@ -20,6 +21,9 @@ public class KebunService {
     private static final String ERR_CODE_IMMUTABLE = "Kebun code is immutable and cannot be changed";
     private static final String ERR_ACTIVE_MANDOR_DELETE = "Cannot delete kebun with active mandor";
     private static final String ERR_REPLACEMENT_REQUIRED = "Replacement mandor is required before unassignment";
+    private static final String ERR_REPLACEMENT_SUPIR_REQUIRED = "Replacement kebun is required before unassigning supir";
+    private static final String ERR_MANDOR_ID_REQUIRED = "Mandor ID is required";
+    private static final String ERR_SUPIR_ID_REQUIRED = "Supir ID is required";
 
     private final KebunRepository kebunRepository;
     private final OverlapValidator overlapValidator;
@@ -53,6 +57,10 @@ public class KebunService {
         return kebunRepository.findByNameContainingIgnoreCase(name);
     }
 
+    public List<Kebun> findByFilters(String name, String code) {
+        return kebunRepository.findByNameAndCodeContainingIgnoreCase(name, code);
+    }
+
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public Kebun update(String code, Kebun updateRequest) {
         return executeWithGlobalWriteLock(() -> {
@@ -74,7 +82,12 @@ public class KebunService {
     }
 
     public void assignMandor(String kebunCode, String mandorId) {
+        if (mandorId == null || mandorId.isBlank()) {
+            throw new IllegalArgumentException(ERR_MANDOR_ID_REQUIRED);
+        }
         requireKebunByCode(kebunCode);
+        kebunRepository.unassignMandorFromAnyKebun(mandorId);
+        kebunRepository.unassignAnyMandorFromKebun(kebunCode);
         kebunRepository.assignMandor(kebunCode, mandorId);
         mandorAssignmentEventPublisher.publish(mandorAssignedTopic, kebunCode, mandorId);
     }
@@ -84,9 +97,72 @@ public class KebunService {
         if (replacementMandorId == null || replacementMandorId.isBlank()) {
             throw new IllegalArgumentException(ERR_REPLACEMENT_REQUIRED);
         }
+        requireKebunByCode(kebunCode);
 
         kebunRepository.unassignMandor(kebunCode, oldMandorId);
+        kebunRepository.unassignMandorFromAnyKebun(replacementMandorId);
         kebunRepository.assignMandor(kebunCode, replacementMandorId);
+        mandorAssignmentEventPublisher.publish(mandorAssignedTopic, kebunCode, replacementMandorId);
+    }
+
+    @Transactional
+    public void reassignMandorToAnotherKebun(String currentKebunCode, String mandorId, String replacementKebunCode) {
+        if (replacementKebunCode == null || replacementKebunCode.isBlank()) {
+            throw new IllegalArgumentException(ERR_REPLACEMENT_REQUIRED);
+        }
+        if (mandorId == null || mandorId.isBlank()) {
+            throw new IllegalArgumentException(ERR_MANDOR_ID_REQUIRED);
+        }
+
+        requireKebunByCode(currentKebunCode);
+        requireKebunByCode(replacementKebunCode);
+
+        kebunRepository.unassignMandor(currentKebunCode, mandorId);
+        kebunRepository.unassignMandorFromAnyKebun(mandorId);
+        kebunRepository.unassignAnyMandorFromKebun(replacementKebunCode);
+        kebunRepository.assignMandor(replacementKebunCode, mandorId);
+        mandorAssignmentEventPublisher.publish(mandorAssignedTopic, replacementKebunCode, mandorId);
+    }
+
+    @Transactional
+    public void assignSupir(String kebunCode, String supirId) {
+        if (supirId == null || supirId.isBlank()) {
+            throw new IllegalArgumentException(ERR_SUPIR_ID_REQUIRED);
+        }
+        requireKebunByCode(kebunCode);
+        kebunRepository.unassignSupirFromAnyKebun(supirId);
+        kebunRepository.assignSupir(kebunCode, supirId);
+    }
+
+    @Transactional
+    public void reassignSupirToAnotherKebun(String currentKebunCode, String supirId, String replacementKebunCode) {
+        if (replacementKebunCode == null || replacementKebunCode.isBlank()) {
+            throw new IllegalArgumentException(ERR_REPLACEMENT_SUPIR_REQUIRED);
+        }
+        if (supirId == null || supirId.isBlank()) {
+            throw new IllegalArgumentException(ERR_SUPIR_ID_REQUIRED);
+        }
+
+        requireKebunByCode(currentKebunCode);
+        requireKebunByCode(replacementKebunCode);
+
+        kebunRepository.unassignSupir(currentKebunCode, supirId);
+        kebunRepository.unassignSupirFromAnyKebun(supirId);
+        kebunRepository.assignSupir(replacementKebunCode, supirId);
+    }
+
+    public KebunDetailResponse getKebunDetailByCode(String code) {
+        Kebun kebun = requireKebunByCode(code);
+        String mandorId = kebunRepository.findMandorIdByKebunCode(code).orElse(null);
+        List<String> supirIds = kebunRepository.findSupirIdsByKebunCode(code);
+        return new KebunDetailResponse(
+                kebun.getCode(),
+                kebun.getName(),
+                kebun.getLuas(),
+                kebun.getCoordinates(),
+                mandorId,
+                supirIds
+        );
     }
 
     public MandorKebunAssignmentResponse getMandorKebunAssignment(Long mandorId) {
