@@ -87,7 +87,7 @@ class KebunControllerTest {
         Kebun kebun1 = Kebun.builder().name("Kebun Sawit A").code("KBNA01").luas(100.0).build();
         Kebun kebun2 = Kebun.builder().name("Kebun Sawit B").code("KBNB02").luas(200.0).build();
 
-        when(kebunService.findByName("Sawit")).thenReturn(List.of(kebun1, kebun2));
+        when(kebunService.findByFilters("Sawit", "")).thenReturn(List.of(kebun1, kebun2));
 
         mockMvc.perform(get("/kebun").param("name", "Sawit"))
                 .andExpect(status().isOk())

@@ -1,5 +1,10 @@
 package id.ac.ui.cs.advprog.kebun.controller;
 
+import id.ac.ui.cs.advprog.kebun.dto.KebunDetailResponse;
+import id.ac.ui.cs.advprog.kebun.dto.MandorAssignmentRequest;
+import id.ac.ui.cs.advprog.kebun.dto.MandorReassignmentRequest;
+import id.ac.ui.cs.advprog.kebun.dto.SupirAssignmentRequest;
+import id.ac.ui.cs.advprog.kebun.dto.SupirReassignmentRequest;
 import id.ac.ui.cs.advprog.kebun.model.Kebun;
 import id.ac.ui.cs.advprog.kebun.service.KebunService;
 import org.springframework.http.HttpStatus;
@@ -15,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/kebun")
@@ -40,9 +46,16 @@ public class KebunController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Kebun>> getAllByName(@RequestParam(name = "name", required = false) String name) {
-        List<Kebun> kebuns = kebunService.findByName(name == null ? "" : name);
+    public ResponseEntity<List<Kebun>> getAllByName(
+            @RequestParam(name = "name", required = false) String name,
+            @RequestParam(name = "code", required = false) String code) {
+        List<Kebun> kebuns = kebunService.findByFilters(name == null ? "" : name, code == null ? "" : code);
         return ResponseEntity.ok(kebuns);
+    }
+
+    @GetMapping("/{code}/detail")
+    public ResponseEntity<KebunDetailResponse> getDetail(@PathVariable String code) {
+        return ResponseEntity.ok(kebunService.getKebunDetailByCode(code));
     }
 
     @PutMapping("/{code}")
@@ -55,5 +68,37 @@ public class KebunController {
     public ResponseEntity<Void> delete(@PathVariable String code) {
         kebunService.delete(code);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{code}/mandor/assign")
+    public ResponseEntity<Map<String, String>> assignMandor(
+            @PathVariable String code,
+            @RequestBody MandorAssignmentRequest request) {
+        kebunService.assignMandor(code, request.mandorId());
+        return ResponseEntity.ok(Map.of("message", "Mandor assigned"));
+    }
+
+    @PostMapping("/{code}/mandor/reassign")
+    public ResponseEntity<Map<String, String>> reassignMandor(
+            @PathVariable String code,
+            @RequestBody MandorReassignmentRequest request) {
+        kebunService.reassignMandorToAnotherKebun(code, request.mandorId(), request.replacementKebunCode());
+        return ResponseEntity.ok(Map.of("message", "Mandor reassigned to another kebun"));
+    }
+
+    @PostMapping("/{code}/supir/assign")
+    public ResponseEntity<Map<String, String>> assignSupir(
+            @PathVariable String code,
+            @RequestBody SupirAssignmentRequest request) {
+        kebunService.assignSupir(code, request.supirId());
+        return ResponseEntity.ok(Map.of("message", "Supir assigned"));
+    }
+
+    @PostMapping("/{code}/supir/reassign")
+    public ResponseEntity<Map<String, String>> reassignSupir(
+            @PathVariable String code,
+            @RequestBody SupirReassignmentRequest request) {
+        kebunService.reassignSupirToAnotherKebun(code, request.supirId(), request.replacementKebunCode());
+        return ResponseEntity.ok(Map.of("message", "Supir reassigned to another kebun"));
     }
 }

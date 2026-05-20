@@ -177,6 +177,8 @@ class KebunServiceTest {
 
         kebunService.assignMandor("KBNA01", "mandor-123");
 
+        verify(kebunRepository, times(1)).unassignMandorFromAnyKebun("mandor-123");
+        verify(kebunRepository, times(1)).unassignAnyMandorFromKebun("KBNA01");
         verify(kebunRepository, times(1)).assignMandor("KBNA01", "mandor-123");
     }
 
@@ -200,9 +202,17 @@ class KebunServiceTest {
 
     @Test
     void unassignMandorShouldPersistWhenReplacementProvided() {
+        Kebun existing = Kebun.builder()
+                .name("Kebun Sawit A")
+                .code("KBNA01")
+                .luas(100.0)
+                .build();
+        when(kebunRepository.findByCode("KBNA01")).thenReturn(Optional.of(existing));
+
         kebunService.unassignMandor("KBNA01", "mandor-123", "mandor-456");
 
         verify(kebunRepository, times(1)).unassignMandor("KBNA01", "mandor-123");
+        verify(kebunRepository, times(1)).unassignMandorFromAnyKebun("mandor-456");
         verify(kebunRepository, times(1)).assignMandor("KBNA01", "mandor-456");
     }
 
