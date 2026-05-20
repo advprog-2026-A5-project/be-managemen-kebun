@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,13 +33,18 @@ class KebunServiceTest {
     private OverlapValidator overlapValidator;
 
     @Mock
-    private KafkaTemplate<String, Object> kafkaTemplate;
+    private MandorAssignmentEventPublisher mandorAssignmentEventPublisher;
 
     private KebunService kebunService;
 
     @BeforeEach
     void setUp() {
-        kebunService = new KebunService(kebunRepository, overlapValidator, kafkaTemplate, "mandor-assigned");
+        kebunService = new KebunService(
+                kebunRepository,
+                overlapValidator,
+                mandorAssignmentEventPublisher,
+                "mandor-assigned"
+        );
     }
 
     @Test
@@ -314,6 +318,33 @@ class KebunServiceTest {
 
         org.junit.jupiter.api.Assertions.assertNotNull(transactional);
         assertEquals(Isolation.SERIALIZABLE, transactional.isolation());
+    }
+
+    @Test
+    void getMandorKebunAssignmentShouldReturnActiveAssignment() {
+        Kebun kebun = Kebun.builder()
+                .name("Kebun A")
+                .code("KB001")
+                .luas(100.0)
+                .build();
+
+        when(kebunRepository.findAssignedKebunByMandorId("3")).thenReturn(Optional.of(kebun));
+
+        var result = kebunService.getMandorKebunAssignment(3L);
+
+        assertEquals(3L, result.mandorId());
+        assertEquals("KB001", result.kebunCode());
+        assertEquals(true, result.active());
+    }
+
+    @Test
+    void getMandorKebunAssignmentShouldReturnInactiveWhenMandorNotAssigned() {
+        when(kebunRepository.findAssignedKebunByMandorId("99")).thenReturn(Optional.empty());
+
+        var result = kebunService.getMandorKebunAssignment(99L);
+
+        assertEquals(99L, result.mandorId());
+        assertEquals(false, result.active());
     }
 }
 

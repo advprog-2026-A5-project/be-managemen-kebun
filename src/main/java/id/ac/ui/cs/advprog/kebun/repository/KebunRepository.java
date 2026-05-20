@@ -24,4 +24,6 @@ public interface KebunRepository {
     void unassignMandor(String kebunCode, String mandorId);
 
     void deleteByCode(String code);
+
+    Optional<Kebun> findAssignedKebunByMandorId(String mandorId);
 }
