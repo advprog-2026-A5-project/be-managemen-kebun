@@ -247,6 +247,26 @@ public class PostgresKebunRepository implements KebunRepository {
         }
     }
 
+    @Override
+    public Optional<Kebun> findAssignedKebunBySupirId(String supirId) {
+        try {
+            Kebun kebun = jdbcTemplate.queryForObject(
+                    """
+                    SELECT k.name, k.code, k.luas, k.coordinates_json
+                    FROM kebun k
+                    JOIN kebun_supir ks ON ks.kebun_code = k.code
+                    WHERE ks.supir_id = ?
+                    LIMIT 1
+                    """,
+                    kebunRowMapper,
+                    supirId
+            );
+            return Optional.ofNullable(kebun);
+        } catch (EmptyResultDataAccessException ex) {
+            return Optional.empty();
+        }
+    }
+
     private Kebun mapKebun(ResultSet rs, int rowNum) throws SQLException {
         return Kebun.builder()
                 .name(rs.getString("name"))
