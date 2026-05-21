@@ -283,6 +283,22 @@ void existsIntersectingExcludingCodeShouldIgnoreExcludedKebun() {
     }
 
     @Test
+    void isMandorAssignedToKebunShouldReturnTrueWhenRelationshipExists() {
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("KBNA01"), eq("M1")))
+                .thenReturn(1);
+
+        assertTrue(repository.isMandorAssignedToKebun("KBNA01", "M1"));
+    }
+
+    @Test
+    void isMandorAssignedToKebunShouldReturnFalseWhenRelationshipMissing() {
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("KBNA01"), eq("M1")))
+                .thenReturn(0);
+
+        assertFalse(repository.isMandorAssignedToKebun("KBNA01", "M1"));
+    }
+
+    @Test
     void findMandorIdByKebunCodeShouldReturnValueWhenExists() {
         when(jdbcTemplate.queryForObject(anyString(), eq(String.class), eq("KBNA01"))).thenReturn("M1");
 
@@ -328,6 +344,22 @@ void existsIntersectingExcludingCodeShouldIgnoreExcludedKebun() {
     void unassignSupirFromAnyKebunShouldDeleteBySupirId() {
         repository.unassignSupirFromAnyKebun("11");
         verify(jdbcTemplate).update(anyString(), eq("11"));
+    }
+
+    @Test
+    void isSupirAssignedToKebunShouldReturnTrueWhenRelationshipExists() {
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("KBNA01"), eq("11")))
+                .thenReturn(1);
+
+        assertTrue(repository.isSupirAssignedToKebun("KBNA01", "11"));
+    }
+
+    @Test
+    void isSupirAssignedToKebunShouldReturnFalseWhenRelationshipMissing() {
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("KBNA01"), eq("11")))
+                .thenReturn(0);
+
+        assertFalse(repository.isSupirAssignedToKebun("KBNA01", "11"));
     }
 
     @Test
