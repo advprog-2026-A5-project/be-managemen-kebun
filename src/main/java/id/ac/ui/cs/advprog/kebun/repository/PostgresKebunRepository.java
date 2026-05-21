@@ -1,21 +1,23 @@
 package id.ac.ui.cs.advprog.kebun.repository;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import id.ac.ui.cs.advprog.kebun.mapper.GeometryMapper;
-import id.ac.ui.cs.advprog.kebun.model.Kebun;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
 import org.locationtech.jts.geom.Polygon;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import id.ac.ui.cs.advprog.kebun.mapper.GeometryMapper;
+import id.ac.ui.cs.advprog.kebun.model.Kebun;
 
 @Repository
 public class PostgresKebunRepository implements KebunRepository {
@@ -49,22 +51,37 @@ public class PostgresKebunRepository implements KebunRepository {
 
     @Override
     public boolean existsIntersecting(Polygon polygon) {
-        return existsIntersectingExcludingCode(polygon, null);
-    }
-
-    @Override
-    public boolean existsIntersectingExcludingCode(Polygon polygon, String excludedCode) {
         List<Kebun> allKebun = jdbcTemplate.query(
                 """
                 SELECT name, code, luas, coordinates_json
                 FROM kebun
-                WHERE (? IS NULL OR code <> ?)
+                """,
+                kebunRowMapper
+        );
+
+        return hasIntersectingPolygon(allKebun, polygon);
+    }
+
+    @Override
+    public boolean existsIntersectingExcludingCode(Polygon polygon, String excludedCode) {
+        if (excludedCode == null || excludedCode.isBlank()) {
+            return existsIntersecting(polygon);
+        }
+
+        List<Kebun> allKebun = jdbcTemplate.query(
+                """
+                SELECT name, code, luas, coordinates_json
+                FROM kebun
+                WHERE code <> ?
                 """,
                 kebunRowMapper,
-                excludedCode,
                 excludedCode
         );
 
+        return hasIntersectingPolygon(allKebun, polygon);
+    }
+
+    private boolean hasIntersectingPolygon(List<Kebun> allKebun, Polygon polygon) {
         return allKebun.stream()
                 .map(Kebun::getCoordinates)
                 .filter(points -> points != null && !points.isEmpty())

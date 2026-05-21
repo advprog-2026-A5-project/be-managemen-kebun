@@ -6,6 +6,8 @@ import id.ac.ui.cs.advprog.kebun.model.Kebun;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Polygon;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -64,35 +66,74 @@ class PostgresKebunRepositoryTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void existsIntersectingShouldReturnTrueWhenPolygonIntersects() {
-        Kebun existing = kebun("Existing", "KBNA01", 100.0, squarePoints());
-        doReturn(List.of(existing)).when(jdbcTemplate).query(anyString(), any(RowMapper.class), any(), any());
+void existsIntersectingShouldReturnTrueWhenPolygonIntersects() {
+    Polygon polygon = polygon(List.of(
+            new Kebun.Point(0, 0),
+            new Kebun.Point(2, 0),
+            new Kebun.Point(2, 2),
+            new Kebun.Point(0, 2)
+    ));
 
-        Polygon candidate = id.ac.ui.cs.advprog.kebun.mapper.GeometryMapper.toPolygon(squarePoints());
+    Kebun existing = Kebun.builder()
+            .code("KBN001")
+            .name("Existing Kebun")
+            .luas(4)
+            .coordinates(List.of(
+                    new Kebun.Point(1, 1),
+                    new Kebun.Point(3, 1),
+                    new Kebun.Point(3, 3),
+                    new Kebun.Point(1, 3)
+            ))
+            .build();
 
-        assertTrue(repository.existsIntersecting(candidate));
-    }
+    doReturn(List.of(existing)).when(jdbcTemplate).query(
+            org.mockito.ArgumentMatchers.<String>argThat(sql ->
+                    sql.contains("FROM kebun") && !sql.contains("WHERE code <>")
+            ),
+            org.mockito.ArgumentMatchers.<RowMapper<Kebun>>any()
+    );
 
-    @Test
-    @SuppressWarnings("unchecked")
-    void existsIntersectingShouldReturnFalseWhenNoRows() {
-        doReturn(List.of()).when(jdbcTemplate).query(anyString(), any(RowMapper.class), any(), any());
+    assertTrue(repository.existsIntersecting(polygon));
+}
 
-        Polygon candidate = id.ac.ui.cs.advprog.kebun.mapper.GeometryMapper.toPolygon(offsetSquarePoints());
+@Test
+void existsIntersectingShouldReturnFalseWhenNoRows() {
+    Polygon polygon = polygon(List.of(
+            new Kebun.Point(0, 0),
+            new Kebun.Point(2, 0),
+            new Kebun.Point(2, 2),
+            new Kebun.Point(0, 2)
+    ));
 
-        assertFalse(repository.existsIntersecting(candidate));
-    }
+    doReturn(List.of()).when(jdbcTemplate).query(
+            org.mockito.ArgumentMatchers.<String>argThat(sql ->
+                    sql.contains("FROM kebun") && !sql.contains("WHERE code <>")
+            ),
+            org.mockito.ArgumentMatchers.<RowMapper<Kebun>>any()
+    );
 
-    @Test
-    @SuppressWarnings("unchecked")
-    void existsIntersectingExcludingCodeShouldIgnoreExcludedKebun() {
-        doReturn(List.of()).when(jdbcTemplate).query(anyString(), any(RowMapper.class), eq("KBNA01"), eq("KBNA01"));
+    assertFalse(repository.existsIntersecting(polygon));
+}
 
-        Polygon candidate = id.ac.ui.cs.advprog.kebun.mapper.GeometryMapper.toPolygon(squarePoints());
+@Test
+void existsIntersectingExcludingCodeShouldIgnoreExcludedKebun() {
+    Polygon polygon = polygon(List.of(
+            new Kebun.Point(0, 0),
+            new Kebun.Point(2, 0),
+            new Kebun.Point(2, 2),
+            new Kebun.Point(0, 2)
+    ));
 
-        assertFalse(repository.existsIntersectingExcludingCode(candidate, "KBNA01"));
-    }
+    doReturn(List.of()).when(jdbcTemplate).query(
+            org.mockito.ArgumentMatchers.<String>argThat(sql ->
+                    sql.contains("FROM kebun") && sql.contains("WHERE code <> ?")
+            ),
+            org.mockito.ArgumentMatchers.<RowMapper<Kebun>>any(),
+            eq("KBN001")
+    );
+
+    assertFalse(repository.existsIntersectingExcludingCode(polygon, "KBN001"));
+}
 
     @Test
     void createShouldInsertKebunWithoutUpsert() throws Exception {
@@ -336,6 +377,20 @@ class PostgresKebunRepositoryTest {
                 });
 
         assertThrows(IllegalStateException.class, () -> repository.findByCode("KBNA01"));
+    }
+
+    private Polygon polygon(List<Kebun.Point> points) {
+        Coordinate[] coordinates = new Coordinate[points.size() + 1];
+
+        for (int i = 0; i < points.size(); i++) {
+            Kebun.Point point = points.get(i);
+            coordinates[i] = new Coordinate(point.getX(), point.getY());
+        }
+
+        Kebun.Point first = points.get(0);
+        coordinates[points.size()] = new Coordinate(first.getX(), first.getY());
+
+        return new GeometryFactory().createPolygon(coordinates);
     }
 
     private Kebun kebun(String name, String code, double luas, List<Kebun.Point> coordinates) {
