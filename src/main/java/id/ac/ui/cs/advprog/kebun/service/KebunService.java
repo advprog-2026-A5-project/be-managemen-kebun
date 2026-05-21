@@ -61,7 +61,9 @@ public class KebunService {
     }
 
     public List<Kebun> findByFilters(String name, String code) {
-        return kebunRepository.findByNameAndCodeContainingIgnoreCase(name, code);
+        String safeName = name == null ? "" : name.trim();
+        String safeCode = code == null ? "" : code.trim();
+        return kebunRepository.findByNameAndCodeContainingIgnoreCase(safeName, safeCode);
     }
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
@@ -79,6 +81,7 @@ public class KebunService {
     }
 
     public void delete(String code) {
+        requireKebunByCode(code);
         if (kebunRepository.existsActiveMandorByKebunCode(code)) {
             throw new IllegalStateException(ERR_ACTIVE_MANDOR_DELETE);
         }
