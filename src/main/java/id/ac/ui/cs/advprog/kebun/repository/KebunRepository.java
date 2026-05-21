@@ -9,9 +9,15 @@ import java.util.Optional;
 public interface KebunRepository {
     void acquireGlobalWriteLock();
 
+    boolean existsByCode(String code);
+
     boolean existsIntersecting(Polygon polygon);
 
-    Kebun save(Kebun kebun);
+    boolean existsIntersectingExcludingCode(Polygon polygon, String excludedCode);
+
+    Kebun create(Kebun kebun);
+
+    Kebun update(Kebun kebun);
 
     Optional<Kebun> findByCode(String code);
 

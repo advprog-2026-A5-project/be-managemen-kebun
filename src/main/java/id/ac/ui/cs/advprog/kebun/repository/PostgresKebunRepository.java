@@ -38,10 +38,31 @@ public class PostgresKebunRepository implements KebunRepository {
     }
 
     @Override
+    public boolean existsByCode(String code) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM kebun WHERE code = ?",
+                Integer.class,
+                code
+        );
+        return count != null && count > 0;
+    }
+
+    @Override
     public boolean existsIntersecting(Polygon polygon) {
+        return existsIntersectingExcludingCode(polygon, null);
+    }
+
+    @Override
+    public boolean existsIntersectingExcludingCode(Polygon polygon, String excludedCode) {
         List<Kebun> allKebun = jdbcTemplate.query(
-                "SELECT name, code, luas, coordinates_json FROM kebun",
-                kebunRowMapper
+                """
+                SELECT name, code, luas, coordinates_json
+                FROM kebun
+                WHERE (? IS NULL OR code <> ?)
+                """,
+                kebunRowMapper,
+                excludedCode,
+                excludedCode
         );
 
         return allKebun.stream()
@@ -52,22 +73,25 @@ public class PostgresKebunRepository implements KebunRepository {
     }
 
     @Override
-    public Kebun save(Kebun kebun) {
-        String sql = """
-                INSERT INTO kebun (code, name, luas, coordinates_json)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT (code) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    luas = EXCLUDED.luas,
-                    coordinates_json = EXCLUDED.coordinates_json
-                """;
-
+    public Kebun create(Kebun kebun) {
         jdbcTemplate.update(
-                sql,
+                "INSERT INTO kebun (code, name, luas, coordinates_json) VALUES (?, ?, ?, ?)",
                 kebun.getCode(),
                 kebun.getName(),
                 kebun.getLuas(),
                 toJson(kebun.getCoordinates())
+        );
+        return kebun;
+    }
+
+    @Override
+    public Kebun update(Kebun kebun) {
+        jdbcTemplate.update(
+                "UPDATE kebun SET name = ?, luas = ?, coordinates_json = ? WHERE code = ?",
+                kebun.getName(),
+                kebun.getLuas(),
+                toJson(kebun.getCoordinates()),
+                kebun.getCode()
         );
         return kebun;
     }
