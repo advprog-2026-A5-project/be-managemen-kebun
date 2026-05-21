@@ -1,21 +1,23 @@
 package id.ac.ui.cs.advprog.kebun.repository;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import id.ac.ui.cs.advprog.kebun.mapper.GeometryMapper;
-import id.ac.ui.cs.advprog.kebun.model.Kebun;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
 import org.locationtech.jts.geom.Polygon;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import id.ac.ui.cs.advprog.kebun.mapper.GeometryMapper;
+import id.ac.ui.cs.advprog.kebun.model.Kebun;
 
 @Repository
 public class PostgresKebunRepository implements KebunRepository {
@@ -38,12 +40,48 @@ public class PostgresKebunRepository implements KebunRepository {
     }
 
     @Override
+    public boolean existsByCode(String code) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM kebun WHERE code = ?",
+                Integer.class,
+                code
+        );
+        return count != null && count > 0;
+    }
+
+    @Override
     public boolean existsIntersecting(Polygon polygon) {
         List<Kebun> allKebun = jdbcTemplate.query(
-                "SELECT name, code, luas, coordinates_json FROM kebun",
+                """
+                SELECT name, code, luas, coordinates_json
+                FROM kebun
+                """,
                 kebunRowMapper
         );
 
+        return hasIntersectingPolygon(allKebun, polygon);
+    }
+
+    @Override
+    public boolean existsIntersectingExcludingCode(Polygon polygon, String excludedCode) {
+        if (excludedCode == null || excludedCode.isBlank()) {
+            return existsIntersecting(polygon);
+        }
+
+        List<Kebun> allKebun = jdbcTemplate.query(
+                """
+                SELECT name, code, luas, coordinates_json
+                FROM kebun
+                WHERE code <> ?
+                """,
+                kebunRowMapper,
+                excludedCode
+        );
+
+        return hasIntersectingPolygon(allKebun, polygon);
+    }
+
+    private boolean hasIntersectingPolygon(List<Kebun> allKebun, Polygon polygon) {
         return allKebun.stream()
                 .map(Kebun::getCoordinates)
                 .filter(points -> points != null && !points.isEmpty())
@@ -52,22 +90,25 @@ public class PostgresKebunRepository implements KebunRepository {
     }
 
     @Override
-    public Kebun save(Kebun kebun) {
-        String sql = """
-                INSERT INTO kebun (code, name, luas, coordinates_json)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT (code) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    luas = EXCLUDED.luas,
-                    coordinates_json = EXCLUDED.coordinates_json
-                """;
-
+    public Kebun create(Kebun kebun) {
         jdbcTemplate.update(
-                sql,
+                "INSERT INTO kebun (code, name, luas, coordinates_json) VALUES (?, ?, ?, ?)",
                 kebun.getCode(),
                 kebun.getName(),
                 kebun.getLuas(),
                 toJson(kebun.getCoordinates())
+        );
+        return kebun;
+    }
+
+    @Override
+    public Kebun update(Kebun kebun) {
+        jdbcTemplate.update(
+                "UPDATE kebun SET name = ?, luas = ?, coordinates_json = ? WHERE code = ?",
+                kebun.getName(),
+                kebun.getLuas(),
+                toJson(kebun.getCoordinates()),
+                kebun.getCode()
         );
         return kebun;
     }
@@ -93,6 +134,24 @@ public class PostgresKebunRepository implements KebunRepository {
                 "SELECT name, code, luas, coordinates_json FROM kebun WHERE LOWER(name) LIKE LOWER(?)",
                 kebunRowMapper,
                 "%" + keyword + "%"
+        );
+    }
+
+    @Override
+    public List<Kebun> findByNameAndCodeContainingIgnoreCase(String name, String code) {
+        String nameKeyword = name == null ? "" : name;
+        String codeKeyword = code == null ? "" : code;
+        return jdbcTemplate.query(
+                """
+                SELECT name, code, luas, coordinates_json
+                FROM kebun
+                WHERE LOWER(name) LIKE LOWER(?)
+                  AND LOWER(code) LIKE LOWER(?)
+                ORDER BY code ASC
+                """,
+                kebunRowMapper,
+                "%" + nameKeyword + "%",
+                "%" + codeKeyword + "%"
         );
     }
 
@@ -125,6 +184,62 @@ public class PostgresKebunRepository implements KebunRepository {
     }
 
     @Override
+    public void unassignMandorFromAnyKebun(String mandorId) {
+        jdbcTemplate.update("DELETE FROM kebun_mandor WHERE mandor_id = ?", mandorId);
+    }
+
+    @Override
+    public void unassignAnyMandorFromKebun(String kebunCode) {
+        jdbcTemplate.update("DELETE FROM kebun_mandor WHERE kebun_code = ?", kebunCode);
+    }
+
+    @Override
+    public Optional<String> findMandorIdByKebunCode(String kebunCode) {
+        try {
+            String mandorId = jdbcTemplate.queryForObject(
+                    "SELECT mandor_id FROM kebun_mandor WHERE kebun_code = ? LIMIT 1",
+                    String.class,
+                    kebunCode
+            );
+            return Optional.ofNullable(mandorId);
+        } catch (EmptyResultDataAccessException ex) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public List<String> findSupirIdsByKebunCode(String kebunCode) {
+        return jdbcTemplate.queryForList(
+                "SELECT supir_id FROM kebun_supir WHERE kebun_code = ? ORDER BY supir_id ASC",
+                String.class,
+                kebunCode
+        );
+    }
+
+    @Override
+    public void assignSupir(String kebunCode, String supirId) {
+        jdbcTemplate.update(
+                "INSERT INTO kebun_supir (kebun_code, supir_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+                kebunCode,
+                supirId
+        );
+    }
+
+    @Override
+    public void unassignSupir(String kebunCode, String supirId) {
+        jdbcTemplate.update(
+                "DELETE FROM kebun_supir WHERE kebun_code = ? AND supir_id = ?",
+                kebunCode,
+                supirId
+        );
+    }
+
+    @Override
+    public void unassignSupirFromAnyKebun(String supirId) {
+        jdbcTemplate.update("DELETE FROM kebun_supir WHERE supir_id = ?", supirId);
+    }
+
+    @Override
     public void deleteByCode(String code) {
         jdbcTemplate.update("DELETE FROM kebun WHERE code = ?", code);
     }
@@ -142,6 +257,26 @@ public class PostgresKebunRepository implements KebunRepository {
                     """,
                     kebunRowMapper,
                     mandorId
+            );
+            return Optional.ofNullable(kebun);
+        } catch (EmptyResultDataAccessException ex) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public Optional<Kebun> findAssignedKebunBySupirId(String supirId) {
+        try {
+            Kebun kebun = jdbcTemplate.queryForObject(
+                    """
+                    SELECT k.name, k.code, k.luas, k.coordinates_json
+                    FROM kebun k
+                    JOIN kebun_supir ks ON ks.kebun_code = k.code
+                    WHERE ks.supir_id = ?
+                    LIMIT 1
+                    """,
+                    kebunRowMapper,
+                    supirId
             );
             return Optional.ofNullable(kebun);
         } catch (EmptyResultDataAccessException ex) {

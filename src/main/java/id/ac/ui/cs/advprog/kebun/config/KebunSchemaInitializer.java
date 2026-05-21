@@ -23,5 +23,13 @@ public class KebunSchemaInitializer {
                     PRIMARY KEY (kebun_code, mandor_id)
                 )
                 """);
+
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS kebun_supir (
+                    kebun_code VARCHAR(64) NOT NULL REFERENCES kebun(code) ON DELETE CASCADE,
+                    supir_id VARCHAR(128) NOT NULL,
+                    PRIMARY KEY (kebun_code, supir_id)
+                )
+                """);
     }
 }

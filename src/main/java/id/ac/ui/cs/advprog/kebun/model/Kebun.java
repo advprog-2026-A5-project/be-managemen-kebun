@@ -5,10 +5,24 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @JsonDeserialize(builder = Kebun.Builder.class)
 public class Kebun {
+    private static final String ERR_NAME_REQUIRED = "Kebun name is required";
+    private static final String ERR_CODE_REQUIRED = "Kebun code is required";
+    private static final String ERR_LUAS_POSITIVE = "Kebun luas must be greater than 0";
+    private static final String ERR_COORDINATES_REQUIRED = "Kebun coordinates are required";
+    private static final String ERR_COORDINATE_COUNT = "Kebun must have exactly 4 coordinate points";
+    private static final String ERR_SHAPE_INVALID = "Kebun coordinates must form a valid 4-sided polygon";
+    private static final String ERR_POINT_REQUIRED = "Kebun coordinate points are required";
+    private static final String ERR_POINT_FINITE = "Kebun point coordinates must be finite numbers";
+
     private final String name;
     private final String code;
     private final double luas;
@@ -69,53 +83,79 @@ public class Kebun {
         }
 
         public Kebun build() {
-            if (coordinates != null) {
-                if (coordinates.size() != 4) {
-                    throw new IllegalArgumentException("Kebun must have exactly 4 coordinate points");
-                }
-                if (!formsSquare(coordinates)) {
-                    throw new IllegalArgumentException("Kebun coordinates must form a square");
+            if (name == null || name.isBlank()) {
+                throw new IllegalArgumentException(ERR_NAME_REQUIRED);
+            }
+            if (code == null || code.isBlank()) {
+                throw new IllegalArgumentException(ERR_CODE_REQUIRED);
+            }
+            if (luas <= 0) {
+                throw new IllegalArgumentException(ERR_LUAS_POSITIVE);
+            }
+            if (coordinates == null) {
+                throw new IllegalArgumentException(ERR_COORDINATES_REQUIRED);
+            }
+            if (coordinates.size() != 4) {
+                throw new IllegalArgumentException(ERR_COORDINATE_COUNT);
+            }
+            if (!formsValidQuadrilateral(coordinates)) {
+                throw new IllegalArgumentException(ERR_SHAPE_INVALID);
+            }
+            for (Point point : coordinates) {
+                if (point == null) {
+                    throw new IllegalArgumentException(ERR_POINT_REQUIRED);
                 }
             }
             return new Kebun(this);
         }
 
-        private boolean formsSquare(List<Point> points) {
-            double[] distances = new double[6];
-            int idx = 0;
-
-            for (int i = 0; i < points.size(); i++) {
-                for (int j = i + 1; j < points.size(); j++) {
-                    distances[idx++] = squaredDistance(points.get(i), points.get(j));
-                }
+        private boolean formsValidQuadrilateral(List<Point> points) {
+            if (points.stream().anyMatch(p -> p == null)) {
+                return false;
             }
-
-            java.util.Arrays.sort(distances);
-
-            double side = distances[0];
-            double diag = distances[4];
-
-            if (side <= 0) {
+            Set<String> uniquePoints = points.stream()
+                    .map(p -> String.format(Locale.US, "%.9f,%.9f", p.getX(), p.getY()))
+                    .collect(Collectors.toSet());
+            if (uniquePoints.size() != 4) {
                 return false;
             }
 
-            return almostEqual(distances[0], side)
-                    && almostEqual(distances[1], side)
-                    && almostEqual(distances[2], side)
-                    && almostEqual(distances[3], side)
-                    && almostEqual(distances[4], diag)
-                    && almostEqual(distances[5], diag)
-                    && almostEqual(diag, 2 * side);
+            List<Point> ordered = orderByAngle(points);
+
+            for (int i = 0; i < ordered.size(); i++) {
+                Point a = ordered.get(i);
+                Point b = ordered.get((i + 1) % ordered.size());
+                Point c = ordered.get((i + 2) % ordered.size());
+                if (Math.abs(cross(a, b, c)) < 1e-9) {
+                    return false;
+                }
+            }
+
+            return polygonArea(ordered) > 1e-9;
         }
 
-        private double squaredDistance(Point a, Point b) {
-            double dx = a.getX() - b.getX();
-            double dy = a.getY() - b.getY();
-            return dx * dx + dy * dy;
+        private List<Point> orderByAngle(List<Point> points) {
+            double centerX = points.stream().mapToDouble(Point::getX).average().orElse(0.0);
+            double centerY = points.stream().mapToDouble(Point::getY).average().orElse(0.0);
+
+            List<Point> ordered = new ArrayList<>(points);
+            ordered.sort(Comparator.comparingDouble(p -> Math.atan2(p.getY() - centerY, p.getX() - centerX)));
+            return ordered;
         }
 
-        private boolean almostEqual(double a, double b) {
-            return Math.abs(a - b) < 1e-9;
+        private double cross(Point a, Point b, Point c) {
+            return (b.getX() - a.getX()) * (c.getY() - a.getY())
+                    - (b.getY() - a.getY()) * (c.getX() - a.getX());
+        }
+
+        private double polygonArea(List<Point> points) {
+            double sum = 0.0;
+            for (int i = 0; i < points.size(); i++) {
+                Point current = points.get(i);
+                Point next = points.get((i + 1) % points.size());
+                sum += current.getX() * next.getY() - next.getX() * current.getY();
+            }
+            return Math.abs(sum) / 2.0;
         }
     }
 
@@ -125,6 +165,9 @@ public class Kebun {
 
         @JsonCreator
         public Point(@JsonProperty("x") double x, @JsonProperty("y") double y) {
+            if (!Double.isFinite(x) || !Double.isFinite(y)) {
+                throw new IllegalArgumentException(ERR_POINT_FINITE);
+            }
             this.x = x;
             this.y = y;
         }

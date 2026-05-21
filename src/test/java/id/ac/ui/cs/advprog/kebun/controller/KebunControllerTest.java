@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.kebun.controller;
 
+import id.ac.ui.cs.advprog.kebun.dto.KebunDetailResponse;
 import id.ac.ui.cs.advprog.kebun.model.Kebun;
 import id.ac.ui.cs.advprog.kebun.service.KebunService;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -37,6 +39,7 @@ class KebunControllerTest {
                 .name("Kebun Sawit A")
                 .code("KBNA01")
                 .luas(100.0)
+                .coordinates(squarePoints())
                 .build();
 
         when(kebunService.create(any(Kebun.class))).thenReturn(created);
@@ -45,7 +48,13 @@ class KebunControllerTest {
                 {
                   "name": "Kebun Sawit A",
                   "code": "KBNA01",
-                  "luas": 100.0
+                  "luas": 100.0,
+                  "coordinates": [
+                    { "x": 0, "y": 0 },
+                    { "x": 0, "y": 1 },
+                    { "x": 1, "y": 1 },
+                    { "x": 1, "y": 0 }
+                  ]
                 }
                 """;
 
@@ -64,6 +73,7 @@ class KebunControllerTest {
                 .name("Kebun Sawit B")
                 .code("KBNB02")
                 .luas(120.0)
+                .coordinates(squarePoints())
                 .build();
 
         when(kebunService.getByCode("KBNB02")).thenReturn(Optional.of(kebun));
@@ -84,10 +94,10 @@ class KebunControllerTest {
 
     @Test
     void getKebunListShouldSupportNameFilter() throws Exception {
-        Kebun kebun1 = Kebun.builder().name("Kebun Sawit A").code("KBNA01").luas(100.0).build();
-        Kebun kebun2 = Kebun.builder().name("Kebun Sawit B").code("KBNB02").luas(200.0).build();
+        Kebun kebun1 = Kebun.builder().name("Kebun Sawit A").code("KBNA01").luas(100.0).coordinates(squarePoints()).build();
+        Kebun kebun2 = Kebun.builder().name("Kebun Sawit B").code("KBNB02").luas(200.0).coordinates(offsetSquarePoints()).build();
 
-        when(kebunService.findByName("Sawit")).thenReturn(List.of(kebun1, kebun2));
+        when(kebunService.findByFilters("Sawit", "")).thenReturn(List.of(kebun1, kebun2));
 
         mockMvc.perform(get("/kebun").param("name", "Sawit"))
                 .andExpect(status().isOk())
@@ -96,11 +106,25 @@ class KebunControllerTest {
     }
 
     @Test
+    void getKebunListShouldReturnAllWhenFiltersAreMissing() throws Exception {
+        Kebun kebun1 = Kebun.builder().name("Kebun Sawit A").code("KBNA01").luas(100.0).coordinates(squarePoints()).build();
+        Kebun kebun2 = Kebun.builder().name("Kebun Sawit B").code("KBNB02").luas(200.0).coordinates(offsetSquarePoints()).build();
+
+        when(kebunService.findByFilters("", "")).thenReturn(List.of(kebun1, kebun2));
+
+        mockMvc.perform(get("/kebun"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("Kebun Sawit A"))
+                .andExpect(jsonPath("$[1].name").value("Kebun Sawit B"));
+    }
+
+    @Test
     void updateKebunShouldReturnUpdatedPayload() throws Exception {
         Kebun updated = Kebun.builder()
                 .name("Kebun Sawit A Updated")
                 .code("KBNA01")
                 .luas(150.0)
+                .coordinates(squarePoints())
                 .build();
 
         when(kebunService.update(any(), any(Kebun.class))).thenReturn(updated);
@@ -109,7 +133,13 @@ class KebunControllerTest {
                 {
                   "name": "Kebun Sawit A Updated",
                   "code": "KBNA01",
-                  "luas": 150.0
+                  "luas": 150.0,
+                  "coordinates": [
+                    { "x": 0, "y": 0 },
+                    { "x": 0, "y": 1 },
+                    { "x": 1, "y": 1 },
+                    { "x": 1, "y": 0 }
+                  ]
                 }
                 """;
 
@@ -127,5 +157,156 @@ class KebunControllerTest {
 
         mockMvc.perform(delete("/kebun/{code}", "KBNA01"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void getKebunListShouldSupportCodeFilter() throws Exception {
+        Kebun kebun = Kebun.builder().name("Kebun Sawit A").code("KBNA01").luas(100.0).coordinates(squarePoints()).build();
+        when(kebunService.findByFilters("", "A01")).thenReturn(List.of(kebun));
+
+        mockMvc.perform(get("/kebun").param("code", "A01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("KBNA01"));
+    }
+
+    @Test
+    void getKebunListShouldSupportNameAndCodeFilter() throws Exception {
+        Kebun kebun = Kebun.builder().name("Kebun Sawit A").code("KBNA01").luas(100.0).coordinates(squarePoints()).build();
+        when(kebunService.findByFilters("Sawit", "A01")).thenReturn(List.of(kebun));
+
+        mockMvc.perform(get("/kebun").param("name", "Sawit").param("code", "A01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("KBNA01"));
+    }
+
+    @Test
+    void getKebunListShouldTrimAndSafelyHandleEmptyFilters() throws Exception {
+        when(kebunService.findByFilters("", "")).thenReturn(List.of());
+
+        mockMvc.perform(get("/kebun").param("name", "  ").param("code", " "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
+
+    @Test
+    void getDetailShouldReturnKebunDetail() throws Exception {
+        KebunDetailResponse detail = new KebunDetailResponse(
+                "KB001",
+                "Kebun A",
+                100.0,
+                List.of(
+                        new Kebun.Point(0, 0),
+                        new Kebun.Point(0, 2),
+                        new Kebun.Point(2, 2),
+                        new Kebun.Point(2, 0)
+                ),
+                "3",
+                List.of("11", "12")
+        );
+        when(kebunService.getKebunDetailByCode("KB001")).thenReturn(detail);
+
+        mockMvc.perform(get("/kebun/{code}/detail", "KB001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("KB001"))
+                .andExpect(jsonPath("$.mandorId").value("3"))
+                .andExpect(jsonPath("$.supirIds[0]").value("11"));
+    }
+
+    @Test
+    void getDetailShouldReturnNotFoundWhenMissing() throws Exception {
+        when(kebunService.getKebunDetailByCode("UNKNOWN"))
+                .thenThrow(new java.util.NoSuchElementException("Kebun not found with code: UNKNOWN"));
+
+        mockMvc.perform(get("/kebun/{code}/detail", "UNKNOWN"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Kebun not found with code: UNKNOWN"));
+    }
+
+    @Test
+    void assignMandorShouldCallService() throws Exception {
+        String body = """
+                {
+                  "mandorId": "3"
+                }
+                """;
+
+        mockMvc.perform(post("/kebun/{code}/mandor/assign", "KB001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Mandor assigned"));
+
+        verify(kebunService).assignMandor("KB001", "3");
+    }
+
+    @Test
+    void reassignMandorShouldCallService() throws Exception {
+        String body = """
+                {
+                  "mandorId": "3",
+                  "replacementKebunCode": "KB002"
+                }
+                """;
+
+        mockMvc.perform(post("/kebun/{code}/mandor/reassign", "KB001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Mandor reassigned to another kebun"));
+
+        verify(kebunService).reassignMandorToAnotherKebun("KB001", "3", "KB002");
+    }
+
+    @Test
+    void assignSupirShouldCallService() throws Exception {
+        String body = """
+                {
+                  "supirId": "11"
+                }
+                """;
+
+        mockMvc.perform(post("/kebun/{code}/supir/assign", "KB001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Supir assigned"));
+
+        verify(kebunService).assignSupir("KB001", "11");
+    }
+
+    @Test
+    void reassignSupirShouldCallService() throws Exception {
+        String body = """
+                {
+                  "supirId": "11",
+                  "replacementKebunCode": "KB002"
+                }
+                """;
+
+        mockMvc.perform(post("/kebun/{code}/supir/reassign", "KB001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Supir reassigned to another kebun"));
+
+        verify(kebunService).reassignSupirToAnotherKebun("KB001", "11", "KB002");
+    }
+
+    private List<Kebun.Point> squarePoints() {
+        return List.of(
+                new Kebun.Point(0, 0),
+                new Kebun.Point(0, 1),
+                new Kebun.Point(1, 1),
+                new Kebun.Point(1, 0)
+        );
+    }
+
+    private List<Kebun.Point> offsetSquarePoints() {
+        return List.of(
+                new Kebun.Point(2, 2),
+                new Kebun.Point(2, 3),
+                new Kebun.Point(3, 3),
+                new Kebun.Point(3, 2)
+        );
     }
 }
