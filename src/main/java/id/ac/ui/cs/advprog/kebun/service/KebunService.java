@@ -29,6 +29,9 @@ public class KebunService {
     private static final String ERR_REPLACEMENT_SUPIR_REQUIRED = "Replacement kebun is required before unassigning supir";
     private static final String ERR_MANDOR_ID_REQUIRED = "Mandor ID is required";
     private static final String ERR_SUPIR_ID_REQUIRED = "Supir ID is required";
+    private static final String ERR_REASSIGN_TO_SAME_KEBUN = "Replacement kebun must be different from current kebun";
+    private static final String ERR_MANDOR_NOT_ASSIGNED_TO_SOURCE = "Mandor is not assigned to the source kebun";
+    private static final String ERR_SUPIR_NOT_ASSIGNED_TO_SOURCE = "Supir is not assigned to the source kebun";
 
     private final KebunRepository kebunRepository;
     private final OverlapValidator overlapValidator;
@@ -128,10 +131,12 @@ public class KebunService {
         if (mandorId == null || mandorId.isBlank()) {
             throw new IllegalArgumentException(ERR_MANDOR_ID_REQUIRED);
         }
+        requireDifferentKebun(currentKebunCode, replacementKebunCode);
         String canonicalMandorId = personnelDirectory.requireMandorId(mandorId);
 
         requireKebunByCode(currentKebunCode);
         requireKebunByCode(replacementKebunCode);
+        ensureMandorAssignedToSourceKebun(currentKebunCode, canonicalMandorId);
 
         kebunRepository.unassignMandor(currentKebunCode, canonicalMandorId);
         kebunRepository.unassignMandorFromAnyKebun(canonicalMandorId);
@@ -159,10 +164,12 @@ public class KebunService {
         if (supirId == null || supirId.isBlank()) {
             throw new IllegalArgumentException(ERR_SUPIR_ID_REQUIRED);
         }
+        requireDifferentKebun(currentKebunCode, replacementKebunCode);
         String canonicalSupirId = personnelDirectory.requireSupirId(supirId);
 
         requireKebunByCode(currentKebunCode);
         requireKebunByCode(replacementKebunCode);
+        ensureSupirAssignedToSourceKebun(currentKebunCode, canonicalSupirId);
 
         kebunRepository.unassignSupir(currentKebunCode, canonicalSupirId);
         kebunRepository.unassignSupirFromAnyKebun(canonicalSupirId);
@@ -220,6 +227,24 @@ public class KebunService {
     private Kebun requireKebunByCode(String code) {
         return kebunRepository.findByCode(code)
                 .orElseThrow(() -> new NoSuchElementException("Kebun not found with code: " + code));
+    }
+
+    private void requireDifferentKebun(String currentKebunCode, String replacementKebunCode) {
+        if (currentKebunCode.equals(replacementKebunCode)) {
+            throw new IllegalArgumentException(ERR_REASSIGN_TO_SAME_KEBUN);
+        }
+    }
+
+    private void ensureMandorAssignedToSourceKebun(String currentKebunCode, String mandorId) {
+        if (!kebunRepository.isMandorAssignedToKebun(currentKebunCode, mandorId)) {
+            throw new IllegalArgumentException(ERR_MANDOR_NOT_ASSIGNED_TO_SOURCE);
+        }
+    }
+
+    private void ensureSupirAssignedToSourceKebun(String currentKebunCode, String supirId) {
+        if (!kebunRepository.isSupirAssignedToKebun(currentKebunCode, supirId)) {
+            throw new IllegalArgumentException(ERR_SUPIR_NOT_ASSIGNED_TO_SOURCE);
+        }
     }
 
     private <T> T executeWithWriteLock(Supplier<T> action) {
