@@ -54,7 +54,7 @@ class OverlapValidatorImplTest {
 
         when(kebunRepository.existsIntersecting(newPolygon)).thenReturn(true);
 
-        assertThrows(IllegalArgumentException.class, () -> overlapValidator.validateNoOverlap(points));
+        assertThrows(IllegalStateException.class, () -> overlapValidator.validateNoOverlap(points));
     }
 
     @Test
@@ -86,6 +86,6 @@ class OverlapValidatorImplTest {
 
         when(kebunRepository.existsIntersecting(polygon)).thenReturn(true);
 
-        assertThrows(IllegalArgumentException.class, () -> overlapValidator.validateNoOverlap(points));
+        assertThrows(IllegalStateException.class, () -> overlapValidator.validateNoOverlap(points));
     }
 }

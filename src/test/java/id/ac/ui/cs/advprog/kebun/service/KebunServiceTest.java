@@ -110,10 +110,10 @@ class KebunServiceTest {
     void createShouldSurfaceOverlapValidationFailure() {
         Kebun request = kebun("Overlap Candidate", "KBNA01", 100.0, squarePoints());
         when(kebunRepository.existsByCode("KBNA01")).thenReturn(false);
-        org.mockito.Mockito.doThrow(new IllegalArgumentException("Kebun coordinates overlap with an existing kebun"))
+        org.mockito.Mockito.doThrow(new IllegalStateException("Kebun coordinates overlap with an existing kebun"))
                 .when(overlapValidator).validateNoOverlap(request.getCoordinates());
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> kebunService.create(request));
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> kebunService.create(request));
 
         assertEquals("Kebun coordinates overlap with an existing kebun", ex.getMessage());
         verify(kebunRepository, never()).create(any(Kebun.class));
@@ -152,6 +152,15 @@ class KebunServiceTest {
 
         assertEquals(1, result.size());
         verify(kebunRepository).findByNameAndCodeContainingIgnoreCase("Sawit", "A01");
+    }
+
+    @Test
+    void findByFiltersShouldTrimWhitespaceAndTreatNullAsEmpty() {
+        when(kebunRepository.findByNameAndCodeContainingIgnoreCase("Sawit", "")).thenReturn(List.of());
+
+        kebunService.findByFilters("  Sawit  ", null);
+
+        verify(kebunRepository).findByNameAndCodeContainingIgnoreCase("Sawit", "");
     }
 
     @Test
@@ -204,10 +213,10 @@ class KebunServiceTest {
         Kebun existing = kebun("Kebun Sawit A", "KBNA01", 100.0, squarePoints());
         Kebun updateRequest = kebun("Kebun Sawit A Updated", "KBNA01", 150.0, offsetSquarePoints());
         when(kebunRepository.findByCode("KBNA01")).thenReturn(Optional.of(existing));
-        org.mockito.Mockito.doThrow(new IllegalArgumentException("Kebun coordinates overlap with an existing kebun"))
+        org.mockito.Mockito.doThrow(new IllegalStateException("Kebun coordinates overlap with an existing kebun"))
                 .when(overlapValidator).validateNoOverlap(updateRequest.getCoordinates(), "KBNA01");
 
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> kebunService.update("KBNA01", updateRequest));
 
         assertEquals("Kebun coordinates overlap with an existing kebun", ex.getMessage());
@@ -245,6 +254,8 @@ class KebunServiceTest {
 
     @Test
     void deleteShouldThrowWhenMandorIsStillActive() {
+        Kebun existing = kebun("Kebun Sawit A", "KBNA01", 100.0, squarePoints());
+        when(kebunRepository.findByCode("KBNA01")).thenReturn(Optional.of(existing));
         when(kebunRepository.existsActiveMandorByKebunCode("KBNA01")).thenReturn(true);
 
         assertThrows(IllegalStateException.class, () -> kebunService.delete("KBNA01"));
@@ -253,11 +264,24 @@ class KebunServiceTest {
 
     @Test
     void deleteShouldProceedWhenNoActiveMandor() {
+        Kebun existing = kebun("Kebun Sawit A", "KBNA01", 100.0, squarePoints());
+        when(kebunRepository.findByCode("KBNA01")).thenReturn(Optional.of(existing));
         when(kebunRepository.existsActiveMandorByKebunCode("KBNA01")).thenReturn(false);
 
         kebunService.delete("KBNA01");
 
         verify(kebunRepository).deleteByCode("KBNA01");
+    }
+
+    @Test
+    void deleteShouldThrowWhenKebunDoesNotExist() {
+        when(kebunRepository.findByCode("MISSING")).thenReturn(Optional.empty());
+
+        NoSuchElementException ex = assertThrows(NoSuchElementException.class, () -> kebunService.delete("MISSING"));
+
+        assertEquals("Kebun not found with code: MISSING", ex.getMessage());
+        verify(kebunRepository, never()).existsActiveMandorByKebunCode("MISSING");
+        verify(kebunRepository, never()).deleteByCode("MISSING");
     }
 
     @Test

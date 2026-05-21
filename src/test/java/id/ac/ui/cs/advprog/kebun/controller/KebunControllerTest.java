@@ -106,6 +106,19 @@ class KebunControllerTest {
     }
 
     @Test
+    void getKebunListShouldReturnAllWhenFiltersAreMissing() throws Exception {
+        Kebun kebun1 = Kebun.builder().name("Kebun Sawit A").code("KBNA01").luas(100.0).coordinates(squarePoints()).build();
+        Kebun kebun2 = Kebun.builder().name("Kebun Sawit B").code("KBNB02").luas(200.0).coordinates(offsetSquarePoints()).build();
+
+        when(kebunService.findByFilters("", "")).thenReturn(List.of(kebun1, kebun2));
+
+        mockMvc.perform(get("/kebun"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("Kebun Sawit A"))
+                .andExpect(jsonPath("$[1].name").value("Kebun Sawit B"));
+    }
+
+    @Test
     void updateKebunShouldReturnUpdatedPayload() throws Exception {
         Kebun updated = Kebun.builder()
                 .name("Kebun Sawit A Updated")
@@ -147,6 +160,16 @@ class KebunControllerTest {
     }
 
     @Test
+    void getKebunListShouldSupportCodeFilter() throws Exception {
+        Kebun kebun = Kebun.builder().name("Kebun Sawit A").code("KBNA01").luas(100.0).coordinates(squarePoints()).build();
+        when(kebunService.findByFilters("", "A01")).thenReturn(List.of(kebun));
+
+        mockMvc.perform(get("/kebun").param("code", "A01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("KBNA01"));
+    }
+
+    @Test
     void getKebunListShouldSupportNameAndCodeFilter() throws Exception {
         Kebun kebun = Kebun.builder().name("Kebun Sawit A").code("KBNA01").luas(100.0).coordinates(squarePoints()).build();
         when(kebunService.findByFilters("Sawit", "A01")).thenReturn(List.of(kebun));
@@ -154,6 +177,15 @@ class KebunControllerTest {
         mockMvc.perform(get("/kebun").param("name", "Sawit").param("code", "A01"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].code").value("KBNA01"));
+    }
+
+    @Test
+    void getKebunListShouldTrimAndSafelyHandleEmptyFilters() throws Exception {
+        when(kebunService.findByFilters("", "")).thenReturn(List.of());
+
+        mockMvc.perform(get("/kebun").param("name", "  ").param("code", " "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
     }
 
     @Test
@@ -178,6 +210,16 @@ class KebunControllerTest {
                 .andExpect(jsonPath("$.code").value("KB001"))
                 .andExpect(jsonPath("$.mandorId").value("3"))
                 .andExpect(jsonPath("$.supirIds[0]").value("11"));
+    }
+
+    @Test
+    void getDetailShouldReturnNotFoundWhenMissing() throws Exception {
+        when(kebunService.getKebunDetailByCode("UNKNOWN"))
+                .thenThrow(new java.util.NoSuchElementException("Kebun not found with code: UNKNOWN"));
+
+        mockMvc.perform(get("/kebun/{code}/detail", "UNKNOWN"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Kebun not found with code: UNKNOWN"));
     }
 
     @Test
