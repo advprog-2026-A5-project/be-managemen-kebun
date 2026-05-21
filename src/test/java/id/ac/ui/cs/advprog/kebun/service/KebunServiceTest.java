@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.kebun.service;
 
 import id.ac.ui.cs.advprog.kebun.event.MandorAssignedEvent;
+import id.ac.ui.cs.advprog.kebun.integration.client.PersonnelDirectory;
 import id.ac.ui.cs.advprog.kebun.model.Kebun;
 import id.ac.ui.cs.advprog.kebun.repository.KebunRepository;
 import id.ac.ui.cs.advprog.kebun.validation.OverlapValidator;
@@ -44,6 +45,9 @@ class KebunServiceTest {
     private OverlapValidator overlapValidator;
 
     @Mock
+    private PersonnelDirectory personnelDirectory;
+
+    @Mock
     private ApplicationEventPublisher applicationEventPublisher;
 
     private KebunService kebunService;
@@ -53,6 +57,7 @@ class KebunServiceTest {
         kebunService = new KebunService(
                 kebunRepository,
                 overlapValidator,
+                personnelDirectory,
                 applicationEventPublisher
         );
     }
@@ -288,20 +293,23 @@ class KebunServiceTest {
     void assignMandorShouldPersistAssignmentWhenKebunExists() {
         Kebun existing = kebun("Kebun Sawit A", "KBNA01", 100.0, squarePoints());
         when(kebunRepository.findByCode("KBNA01")).thenReturn(Optional.of(existing));
+        when(personnelDirectory.requireMandorId("3")).thenReturn("3");
 
-        kebunService.assignMandor("KBNA01", "mandor-123");
+        kebunService.assignMandor("KBNA01", "3");
 
-        verify(kebunRepository).unassignMandorFromAnyKebun("mandor-123");
+        verify(personnelDirectory).requireMandorId("3");
+        verify(kebunRepository).unassignMandorFromAnyKebun("3");
         verify(kebunRepository).unassignAnyMandorFromKebun("KBNA01");
-        verify(kebunRepository).assignMandor("KBNA01", "mandor-123");
+        verify(kebunRepository).assignMandor("KBNA01", "3");
     }
 
     @Test
     void assignMandorShouldThrowWhenKebunNotFound() {
+        when(personnelDirectory.requireMandorId("3")).thenReturn("3");
         when(kebunRepository.findByCode("UNKNOWN")).thenReturn(Optional.empty());
 
         assertThrows(NoSuchElementException.class,
-                () -> kebunService.assignMandor("UNKNOWN", "mandor-123"));
+                () -> kebunService.assignMandor("UNKNOWN", "3"));
 
         verify(kebunRepository, never()).assignMandor(any(), any());
     }
@@ -310,6 +318,18 @@ class KebunServiceTest {
     void assignMandorShouldThrowWhenMandorIdBlank() {
         assertThrows(IllegalArgumentException.class,
                 () -> kebunService.assignMandor("KBNA01", " "));
+        verify(kebunRepository, never()).assignMandor(any(), any());
+    }
+
+    @Test
+    void assignMandorShouldRejectUserWithWrongRoleOrUnknownIdentity() {
+        when(personnelDirectory.requireMandorId("7"))
+                .thenThrow(new IllegalArgumentException("User 7 must have role MANDOR"));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> kebunService.assignMandor("KBNA01", "7"));
+
+        assertEquals("User 7 must have role MANDOR", ex.getMessage());
         verify(kebunRepository, never()).assignMandor(any(), any());
     }
 
@@ -325,18 +345,20 @@ class KebunServiceTest {
     void unassignMandorShouldPersistWhenReplacementProvided() {
         Kebun existing = kebun("Kebun Sawit A", "KBNA01", 100.0, squarePoints());
         when(kebunRepository.findByCode("KBNA01")).thenReturn(Optional.of(existing));
+        when(personnelDirectory.requireMandorId("456")).thenReturn("456");
 
-        kebunService.unassignMandor("KBNA01", "mandor-123", "mandor-456");
+        kebunService.unassignMandor("KBNA01", "123", "456");
 
-        verify(kebunRepository).unassignMandor("KBNA01", "mandor-123");
-        verify(kebunRepository).unassignMandorFromAnyKebun("mandor-456");
-        verify(kebunRepository).assignMandor("KBNA01", "mandor-456");
+        verify(kebunRepository).unassignMandor("KBNA01", "123");
+        verify(kebunRepository).unassignMandorFromAnyKebun("456");
+        verify(kebunRepository).assignMandor("KBNA01", "456");
     }
 
     @Test
     void reassignMandorShouldMoveMandorToReplacementKebun() {
         Kebun current = kebun("Kebun A", "KB001", 100.0, squarePoints());
         Kebun replacement = kebun("Kebun B", "KB002", 120.0, offsetSquarePoints());
+        when(personnelDirectory.requireMandorId("3")).thenReturn("3");
         when(kebunRepository.findByCode("KB001")).thenReturn(Optional.of(current));
         when(kebunRepository.findByCode("KB002")).thenReturn(Optional.of(replacement));
 
@@ -354,6 +376,20 @@ class KebunServiceTest {
     }
 
     @Test
+    void reassignMandorShouldFailBeforeMutatingWhenTargetKebunMissing() {
+        Kebun current = kebun("Kebun A", "KB001", 100.0, squarePoints());
+        when(personnelDirectory.requireMandorId("3")).thenReturn("3");
+        when(kebunRepository.findByCode("KB001")).thenReturn(Optional.of(current));
+        when(kebunRepository.findByCode("KB999")).thenReturn(Optional.empty());
+
+        assertThrows(NoSuchElementException.class,
+                () -> kebunService.reassignMandorToAnotherKebun("KB001", "3", "KB999"));
+
+        verify(kebunRepository, never()).unassignMandor(any(), any());
+        verify(kebunRepository, never()).assignMandor(any(), any());
+    }
+
+    @Test
     void reassignMandorShouldThrowWhenReplacementMissing() {
         assertThrows(IllegalArgumentException.class,
                 () -> kebunService.reassignMandorToAnotherKebun("KB001", "3", " "));
@@ -362,12 +398,24 @@ class KebunServiceTest {
     @Test
     void assignSupirShouldPersistWhenInputsValid() {
         Kebun kebun = kebun("Kebun A", "KB001", 100.0, squarePoints());
+        when(personnelDirectory.requireSupirId("11")).thenReturn("11");
         when(kebunRepository.findByCode("KB001")).thenReturn(Optional.of(kebun));
 
         kebunService.assignSupir("KB001", "11");
 
+        verify(personnelDirectory).requireSupirId("11");
         verify(kebunRepository).unassignSupirFromAnyKebun("11");
         verify(kebunRepository).assignSupir("KB001", "11");
+    }
+
+    @Test
+    void assignSupirShouldThrowWhenKebunNotFound() {
+        when(personnelDirectory.requireSupirId("11")).thenReturn("11");
+        when(kebunRepository.findByCode("UNKNOWN")).thenReturn(Optional.empty());
+
+        assertThrows(NoSuchElementException.class, () -> kebunService.assignSupir("UNKNOWN", "11"));
+
+        verify(kebunRepository, never()).assignSupir(any(), any());
     }
 
     @Test
@@ -377,9 +425,22 @@ class KebunServiceTest {
     }
 
     @Test
+    void assignSupirShouldRejectUserWithWrongRoleOrUnknownIdentity() {
+        when(personnelDirectory.requireSupirId("9"))
+                .thenThrow(new IllegalArgumentException("User 9 must have role SUPIR"));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> kebunService.assignSupir("KB001", "9"));
+
+        assertEquals("User 9 must have role SUPIR", ex.getMessage());
+        verify(kebunRepository, never()).assignSupir(any(), any());
+    }
+
+    @Test
     void reassignSupirShouldMoveSupirToReplacementKebun() {
         Kebun current = kebun("Kebun A", "KB001", 100.0, squarePoints());
         Kebun replacement = kebun("Kebun B", "KB002", 120.0, offsetSquarePoints());
+        when(personnelDirectory.requireSupirId("11")).thenReturn("11");
         when(kebunRepository.findByCode("KB001")).thenReturn(Optional.of(current));
         when(kebunRepository.findByCode("KB002")).thenReturn(Optional.of(replacement));
 
@@ -388,6 +449,20 @@ class KebunServiceTest {
         verify(kebunRepository).unassignSupir("KB001", "11");
         verify(kebunRepository).unassignSupirFromAnyKebun("11");
         verify(kebunRepository).assignSupir("KB002", "11");
+    }
+
+    @Test
+    void reassignSupirShouldFailBeforeMutatingWhenTargetKebunMissing() {
+        Kebun current = kebun("Kebun A", "KB001", 100.0, squarePoints());
+        when(personnelDirectory.requireSupirId("11")).thenReturn("11");
+        when(kebunRepository.findByCode("KB001")).thenReturn(Optional.of(current));
+        when(kebunRepository.findByCode("KB999")).thenReturn(Optional.empty());
+
+        assertThrows(NoSuchElementException.class,
+                () -> kebunService.reassignSupirToAnotherKebun("KB001", "11", "KB999"));
+
+        verify(kebunRepository, never()).unassignSupir(any(), any());
+        verify(kebunRepository, never()).assignSupir(any(), any());
     }
 
     @Test
@@ -520,6 +595,64 @@ class KebunServiceTest {
 
         assertEquals(99L, result.mandorId());
         assertEquals(false, result.active());
+    }
+
+    @Test
+    void getSupirKebunAssignmentShouldReturnActiveAssignment() {
+        Kebun kebun = kebun("Kebun B", "KB002", 120.0, offsetSquarePoints());
+        when(kebunRepository.findAssignedKebunBySupirId("11")).thenReturn(Optional.of(kebun));
+
+        var result = kebunService.getSupirKebunAssignment(11L);
+
+        assertEquals(11L, result.supirId());
+        assertEquals("KB002", result.kebunCode());
+        assertTrue(result.active());
+    }
+
+    @Test
+    void getSupirKebunAssignmentShouldReturnInactiveWhenSupirNotAssigned() {
+        when(kebunRepository.findAssignedKebunBySupirId("11")).thenReturn(Optional.empty());
+
+        var result = kebunService.getSupirKebunAssignment(11L);
+
+        assertEquals(11L, result.supirId());
+        assertEquals(false, result.active());
+    }
+
+    @Test
+    void assignMandorShouldBeTransactional() throws NoSuchMethodException {
+        Transactional transactional = KebunService.class
+                .getMethod("assignMandor", String.class, String.class)
+                .getAnnotation(Transactional.class);
+
+        assertDoesNotThrow(() -> assertEquals(true, transactional != null));
+    }
+
+    @Test
+    void reassignMandorShouldBeTransactional() throws NoSuchMethodException {
+        Transactional transactional = KebunService.class
+                .getMethod("reassignMandorToAnotherKebun", String.class, String.class, String.class)
+                .getAnnotation(Transactional.class);
+
+        assertDoesNotThrow(() -> assertEquals(true, transactional != null));
+    }
+
+    @Test
+    void assignSupirShouldBeTransactional() throws NoSuchMethodException {
+        Transactional transactional = KebunService.class
+                .getMethod("assignSupir", String.class, String.class)
+                .getAnnotation(Transactional.class);
+
+        assertDoesNotThrow(() -> assertEquals(true, transactional != null));
+    }
+
+    @Test
+    void reassignSupirShouldBeTransactional() throws NoSuchMethodException {
+        Transactional transactional = KebunService.class
+                .getMethod("reassignSupirToAnotherKebun", String.class, String.class, String.class)
+                .getAnnotation(Transactional.class);
+
+        assertDoesNotThrow(() -> assertEquals(true, transactional != null));
     }
 
     private Kebun kebun(String name, String code, double luas, List<Kebun.Point> coordinates) {

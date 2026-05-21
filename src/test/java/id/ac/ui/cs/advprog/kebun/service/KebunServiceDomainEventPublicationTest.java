@@ -1,6 +1,7 @@
 package id.ac.ui.cs.advprog.kebun.service;
 
 import id.ac.ui.cs.advprog.kebun.event.MandorAssignedEvent;
+import id.ac.ui.cs.advprog.kebun.integration.client.PersonnelDirectory;
 import id.ac.ui.cs.advprog.kebun.model.Kebun;
 import id.ac.ui.cs.advprog.kebun.repository.KebunRepository;
 import id.ac.ui.cs.advprog.kebun.validation.OverlapValidator;
@@ -28,11 +29,15 @@ class KebunServiceDomainEventPublicationTest {
     @Mock
     private ApplicationEventPublisher applicationEventPublisher;
 
+    @Mock
+    private PersonnelDirectory personnelDirectory;
+
     @Test
     void assignMandorShouldPublishMandorAssignedDomainEvent() {
         KebunService kebunService = new KebunService(
                 kebunRepository,
                 overlapValidator,
+                personnelDirectory,
                 applicationEventPublisher
         );
 
@@ -40,12 +45,14 @@ class KebunServiceDomainEventPublicationTest {
                 Kebun.builder().name("Kebun A").code("KB001").luas(100.0).coordinates(squarePoints()).build()
         ));
 
-        kebunService.assignMandor("KB001", "mandor-123");
+        when(personnelDirectory.requireMandorId("3")).thenReturn("3");
+
+        kebunService.assignMandor("KB001", "3");
 
         verify(applicationEventPublisher).publishEvent(argThat((Object event) ->
                 event instanceof MandorAssignedEvent
                         && "KB001".equals(((MandorAssignedEvent) event).getKebunCode())
-                        && "mandor-123".equals(((MandorAssignedEvent) event).getMandorId())
+                        && "3".equals(((MandorAssignedEvent) event).getMandorId())
         ));
     }
 

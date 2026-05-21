@@ -41,12 +41,20 @@ class KebunDtoRecordTest {
         MandorReassignmentRequest mandorReassignment = new MandorReassignmentRequest("7", "KB002");
         SupirAssignmentRequest supirAssignment = new SupirAssignmentRequest("11");
         SupirReassignmentRequest supirReassignment = new SupirReassignmentRequest("11", "KB003");
+        MandorKebunAssignmentResponse mandorAssignmentResponse =
+                new MandorKebunAssignmentResponse(7L, null, "KB002", "Kebun B", true);
+        SupirKebunAssignmentResponse supirAssignmentResponse =
+                new SupirKebunAssignmentResponse(11L, null, "KB003", "Kebun C", true);
 
         assertEquals("7", mandorAssignment.mandorId());
         assertEquals("7", mandorReassignment.mandorId());
         assertEquals("KB002", mandorReassignment.replacementKebunCode());
         assertEquals("11", supirAssignment.supirId());
         assertEquals("11", supirReassignment.supirId());
+        assertEquals(7L, mandorAssignmentResponse.mandorId());
+        assertEquals("KB002", mandorAssignmentResponse.kebunCode());
+        assertEquals(11L, supirAssignmentResponse.supirId());
+        assertEquals("KB003", supirAssignmentResponse.kebunCode());
         assertTrue(supirReassignment.replacementKebunCode().startsWith("KB"));
     }
 }

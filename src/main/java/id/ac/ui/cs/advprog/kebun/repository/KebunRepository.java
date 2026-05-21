@@ -48,4 +48,6 @@ public interface KebunRepository {
     void deleteByCode(String code);
 
     Optional<Kebun> findAssignedKebunByMandorId(String mandorId);
+
+    Optional<Kebun> findAssignedKebunBySupirId(String supirId);
 }
