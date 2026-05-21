@@ -12,6 +12,8 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import org.springframework.beans.factory.annotation.Autowired;
+
 @Component
 public class RestPersonnelDirectory implements PersonnelDirectory {
 
@@ -24,8 +26,9 @@ public class RestPersonnelDirectory implements PersonnelDirectory {
     private final Clock clock;
     private final ConcurrentMap<CacheKey, CacheEntry> identityCache = new ConcurrentHashMap<>();
 
+    @Autowired
     public RestPersonnelDirectory(RestClient.Builder restClientBuilder,
-                                  AuthServiceProperties authServiceProperties) {
+                                AuthServiceProperties authServiceProperties) {
         this(restClientBuilder, authServiceProperties, Clock.systemUTC());
     }
 
