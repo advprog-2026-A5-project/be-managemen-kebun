@@ -14,6 +14,15 @@ import java.util.stream.Collectors;
 
 @JsonDeserialize(builder = Kebun.Builder.class)
 public class Kebun {
+    private static final String ERR_NAME_REQUIRED = "Kebun name is required";
+    private static final String ERR_CODE_REQUIRED = "Kebun code is required";
+    private static final String ERR_LUAS_POSITIVE = "Kebun luas must be greater than 0";
+    private static final String ERR_COORDINATES_REQUIRED = "Kebun coordinates are required";
+    private static final String ERR_COORDINATE_COUNT = "Kebun must have exactly 4 coordinate points";
+    private static final String ERR_SHAPE_INVALID = "Kebun coordinates must form a valid 4-sided polygon";
+    private static final String ERR_POINT_REQUIRED = "Kebun coordinate points are required";
+    private static final String ERR_POINT_FINITE = "Kebun point coordinates must be finite numbers";
+
     private final String name;
     private final String code;
     private final double luas;
@@ -74,18 +83,36 @@ public class Kebun {
         }
 
         public Kebun build() {
-            if (coordinates != null) {
-                if (coordinates.size() != 4) {
-                    throw new IllegalArgumentException("Kebun must have exactly 4 coordinate points");
-                }
-                if (!formsValidQuadrilateral(coordinates)) {
-                    throw new IllegalArgumentException("Kebun coordinates must form a valid 4-sided polygon");
+            if (name == null || name.isBlank()) {
+                throw new IllegalArgumentException(ERR_NAME_REQUIRED);
+            }
+            if (code == null || code.isBlank()) {
+                throw new IllegalArgumentException(ERR_CODE_REQUIRED);
+            }
+            if (luas <= 0) {
+                throw new IllegalArgumentException(ERR_LUAS_POSITIVE);
+            }
+            if (coordinates == null) {
+                throw new IllegalArgumentException(ERR_COORDINATES_REQUIRED);
+            }
+            if (coordinates.size() != 4) {
+                throw new IllegalArgumentException(ERR_COORDINATE_COUNT);
+            }
+            if (!formsValidQuadrilateral(coordinates)) {
+                throw new IllegalArgumentException(ERR_SHAPE_INVALID);
+            }
+            for (Point point : coordinates) {
+                if (point == null) {
+                    throw new IllegalArgumentException(ERR_POINT_REQUIRED);
                 }
             }
             return new Kebun(this);
         }
 
         private boolean formsValidQuadrilateral(List<Point> points) {
+            if (points.stream().anyMatch(p -> p == null)) {
+                return false;
+            }
             Set<String> uniquePoints = points.stream()
                     .map(p -> String.format(Locale.US, "%.9f,%.9f", p.getX(), p.getY()))
                     .collect(Collectors.toSet());
@@ -138,6 +165,9 @@ public class Kebun {
 
         @JsonCreator
         public Point(@JsonProperty("x") double x, @JsonProperty("y") double y) {
+            if (!Double.isFinite(x) || !Double.isFinite(y)) {
+                throw new IllegalArgumentException(ERR_POINT_FINITE);
+            }
             this.x = x;
             this.y = y;
         }
