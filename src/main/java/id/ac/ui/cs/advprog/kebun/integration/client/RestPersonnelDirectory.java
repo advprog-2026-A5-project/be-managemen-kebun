@@ -12,11 +12,14 @@ public class RestPersonnelDirectory implements PersonnelDirectory {
 
     private static final String ROLE_MANDOR = "MANDOR";
     private static final String ROLE_SUPIR = "SUPIR";
+    private static final String INTERNAL_SERVICE_TOKEN_HEADER = "X-Internal-Service-Token";
 
+    private final AuthServiceProperties authServiceProperties;
     private final RestClient restClient;
 
     public RestPersonnelDirectory(RestClient.Builder restClientBuilder,
                                   AuthServiceProperties authServiceProperties) {
+        this.authServiceProperties = authServiceProperties;
         this.restClient = restClientBuilder
                 .baseUrl(authServiceProperties.getBaseUrl())
                 .build();
@@ -35,17 +38,23 @@ public class RestPersonnelDirectory implements PersonnelDirectory {
     private String requireUserWithRole(String rawId, String expectedRole) {
         Long userId = parseUserId(rawId, expectedRole);
         InternalUserIdentityResponse identity = fetchIdentity(userId, expectedRole);
+
         if (identity == null || identity.id() == null || identity.role() == null || identity.role().isBlank()) {
             throw new IllegalStateException("Failed to validate " + expectedRole + " identity");
         }
+
         if (!expectedRole.equalsIgnoreCase(identity.role())) {
             throw new IllegalArgumentException("User " + userId + " must have role " + expectedRole);
         }
+
         return String.valueOf(identity.id());
     }
 
     private Long parseUserId(String rawId, String expectedRole) {
         try {
+            if (rawId == null || rawId.isBlank()) {
+                throw new NumberFormatException("blank id");
+            }
             return Long.valueOf(rawId.trim());
         } catch (RuntimeException ex) {
             throw new IllegalArgumentException(expectedRole + " ID must be a valid numeric user ID", ex);
@@ -56,6 +65,7 @@ public class RestPersonnelDirectory implements PersonnelDirectory {
         try {
             return restClient.get()
                     .uri("/internal/users/{id}/identity", userId)
+                    .header(INTERNAL_SERVICE_TOKEN_HEADER, authServiceProperties.getInternalServiceToken())
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (request, response) -> {
                         throw new IllegalArgumentException(expectedRole + " user not found: " + userId);
