@@ -35,7 +35,7 @@ public class OverlapValidatorImpl implements OverlapValidator {
                 ? kebunRepository.existsIntersecting(polygon)
                 : kebunRepository.existsIntersectingExcludingCode(polygon, excludedCode);
         if (intersects) {
-            throw new IllegalArgumentException(ERR_OVERLAP);
+            throw new IllegalStateException(ERR_OVERLAP);
         }
     }
 }
