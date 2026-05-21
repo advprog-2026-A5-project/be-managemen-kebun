@@ -9,6 +9,7 @@ public class AuthServiceProperties {
 
     private String baseUrl;
     private String internalServiceToken = "dev-internal-token";
+    private long identityCacheTtlSeconds = 30;
     
     public String getBaseUrl() {
         return baseUrl;
@@ -24,5 +25,13 @@ public class AuthServiceProperties {
 
     public void setInternalServiceToken(String internalServiceToken) {
         this.internalServiceToken = internalServiceToken;
+    }
+
+    public long getIdentityCacheTtlSeconds() {
+        return identityCacheTtlSeconds;
+    }
+
+    public void setIdentityCacheTtlSeconds(long identityCacheTtlSeconds) {
+        this.identityCacheTtlSeconds = identityCacheTtlSeconds;
     }
 }
