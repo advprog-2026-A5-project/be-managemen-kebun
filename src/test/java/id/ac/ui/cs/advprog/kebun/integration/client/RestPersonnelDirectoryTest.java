@@ -95,6 +95,36 @@ class RestPersonnelDirectoryTest {
     }
 
     @Test
+    void requireMandorIdShouldRejectNonNumericUserId() {
+        RestClient.Builder builder = RestClient.builder();
+        AuthServiceProperties properties = new AuthServiceProperties();
+        properties.setBaseUrl("http://auth-service");
+        properties.setInternalServiceToken("token-123");
+
+        RestPersonnelDirectory directory = new RestPersonnelDirectory(builder, properties);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> directory.requireMandorId("mandor-abc"));
+
+        assertEquals("MANDOR ID must be a valid numeric user ID", ex.getMessage());
+    }
+
+    @Test
+    void requireSupirIdShouldRejectNonNumericUserId() {
+        RestClient.Builder builder = RestClient.builder();
+        AuthServiceProperties properties = new AuthServiceProperties();
+        properties.setBaseUrl("http://auth-service");
+        properties.setInternalServiceToken("token-123");
+
+        RestPersonnelDirectory directory = new RestPersonnelDirectory(builder, properties);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> directory.requireSupirId("supir-xyz"));
+
+        assertEquals("SUPIR ID must be a valid numeric user ID", ex.getMessage());
+    }
+
+    @Test
     void requireSupirIdShouldReturnCanonicalNumericIdentifierWhenUserRoleMatches() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();

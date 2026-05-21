@@ -194,6 +194,17 @@ public class PostgresKebunRepository implements KebunRepository {
     }
 
     @Override
+    public boolean isMandorAssignedToKebun(String kebunCode, String mandorId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM kebun_mandor WHERE kebun_code = ? AND mandor_id = ?",
+                Integer.class,
+                kebunCode,
+                mandorId
+        );
+        return count != null && count > 0;
+    }
+
+    @Override
     public Optional<String> findMandorIdByKebunCode(String kebunCode) {
         try {
             String mandorId = jdbcTemplate.queryForObject(
@@ -237,6 +248,17 @@ public class PostgresKebunRepository implements KebunRepository {
     @Override
     public void unassignSupirFromAnyKebun(String supirId) {
         jdbcTemplate.update("DELETE FROM kebun_supir WHERE supir_id = ?", supirId);
+    }
+
+    @Override
+    public boolean isSupirAssignedToKebun(String kebunCode, String supirId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM kebun_supir WHERE kebun_code = ? AND supir_id = ?",
+                Integer.class,
+                kebunCode,
+                supirId
+        );
+        return count != null && count > 0;
     }
 
     @Override

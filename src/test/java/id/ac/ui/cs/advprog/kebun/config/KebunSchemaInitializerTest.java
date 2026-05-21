@@ -19,5 +19,6 @@ class KebunSchemaInitializerTest {
         verify(jdbcTemplate, times(1)).execute(contains("CREATE TABLE IF NOT EXISTS kebun ("));
         verify(jdbcTemplate, times(1)).execute(contains("CREATE TABLE IF NOT EXISTS kebun_mandor ("));
         verify(jdbcTemplate, times(1)).execute(contains("CREATE TABLE IF NOT EXISTS kebun_supir ("));
+        verify(jdbcTemplate, times(2)).execute(contains("REFERENCES kebun(code) ON DELETE CASCADE"));
     }
 }
