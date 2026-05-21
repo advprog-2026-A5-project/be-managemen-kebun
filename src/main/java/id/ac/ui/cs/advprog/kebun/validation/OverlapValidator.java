@@ -6,4 +6,6 @@ import java.util.List;
 
 public interface OverlapValidator {
     void validateNoOverlap(List<Kebun.Point> points);
+
+    void validateNoOverlap(List<Kebun.Point> points, String excludedCode);
 }

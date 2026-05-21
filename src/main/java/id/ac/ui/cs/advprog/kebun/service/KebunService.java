@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
@@ -20,6 +21,7 @@ import java.util.function.Supplier;
 public class KebunService {
 
     private static final String ERR_CODE_IMMUTABLE = "Kebun code is immutable and cannot be changed";
+    private static final String ERR_CODE_ALREADY_EXISTS = "Kebun with code already exists: ";
     private static final String ERR_ACTIVE_MANDOR_DELETE = "Cannot delete kebun with active mandor";
     private static final String ERR_REPLACEMENT_REQUIRED = "Replacement mandor is required before unassignment";
     private static final String ERR_REPLACEMENT_SUPIR_REQUIRED = "Replacement kebun is required before unassigning supir";
@@ -42,8 +44,11 @@ public class KebunService {
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public Kebun create(Kebun kebun) {
         return executeWithGlobalWriteLock(() -> {
+            if (kebunRepository.existsByCode(kebun.getCode())) {
+                throw new IllegalStateException(ERR_CODE_ALREADY_EXISTS + kebun.getCode());
+            }
             overlapValidator.validateNoOverlap(kebun.getCoordinates());
-            return kebunRepository.save(kebun);
+            return kebunRepository.create(kebun);
         });
     }
 
@@ -68,7 +73,8 @@ public class KebunService {
                 throw new IllegalArgumentException(ERR_CODE_IMMUTABLE);
             }
 
-            return kebunRepository.save(updateRequest);
+            overlapValidator.validateNoOverlap(updateRequest.getCoordinates(), existing.getCode());
+            return kebunRepository.update(updateRequest);
         });
     }
 
@@ -182,7 +188,7 @@ public class KebunService {
 
     private Kebun requireKebunByCode(String code) {
         return kebunRepository.findByCode(code)
-                .orElseThrow(() -> new IllegalArgumentException("Kebun not found with code: " + code));
+                .orElseThrow(() -> new NoSuchElementException("Kebun not found with code: " + code));
     }
 
     private <T> T executeWithWriteLock(Supplier<T> action) {

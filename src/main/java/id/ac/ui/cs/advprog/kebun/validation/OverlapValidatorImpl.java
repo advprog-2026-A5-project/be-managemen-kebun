@@ -10,6 +10,8 @@ import java.util.List;
 
 @Component
 public class OverlapValidatorImpl implements OverlapValidator {
+    private static final String ERR_COORDINATES_REQUIRED = "Kebun coordinates are required for overlap validation";
+    private static final String ERR_OVERLAP = "Kebun coordinates overlap with an existing kebun";
 
     private final KebunRepository kebunRepository;
 
@@ -19,13 +21,21 @@ public class OverlapValidatorImpl implements OverlapValidator {
 
     @Override
     public void validateNoOverlap(List<Kebun.Point> points) {
+        validateNoOverlap(points, null);
+    }
+
+    @Override
+    public void validateNoOverlap(List<Kebun.Point> points, String excludedCode) {
         if (points == null || points.isEmpty()) {
-            throw new IllegalArgumentException("Kebun coordinates are required for overlap validation");
+            throw new IllegalArgumentException(ERR_COORDINATES_REQUIRED);
         }
 
         Polygon polygon = GeometryMapper.toPolygon(points);
-        if (kebunRepository.existsIntersecting(polygon)) {
-            throw new IllegalArgumentException("Kebun coordinates overlap with an existing kebun");
+        boolean intersects = excludedCode == null
+                ? kebunRepository.existsIntersecting(polygon)
+                : kebunRepository.existsIntersectingExcludingCode(polygon, excludedCode);
+        if (intersects) {
+            throw new IllegalArgumentException(ERR_OVERLAP);
         }
     }
 }
