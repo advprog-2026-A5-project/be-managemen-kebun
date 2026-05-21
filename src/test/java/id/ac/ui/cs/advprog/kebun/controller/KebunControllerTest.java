@@ -39,6 +39,7 @@ class KebunControllerTest {
                 .name("Kebun Sawit A")
                 .code("KBNA01")
                 .luas(100.0)
+                .coordinates(squarePoints())
                 .build();
 
         when(kebunService.create(any(Kebun.class))).thenReturn(created);
@@ -47,7 +48,13 @@ class KebunControllerTest {
                 {
                   "name": "Kebun Sawit A",
                   "code": "KBNA01",
-                  "luas": 100.0
+                  "luas": 100.0,
+                  "coordinates": [
+                    { "x": 0, "y": 0 },
+                    { "x": 0, "y": 1 },
+                    { "x": 1, "y": 1 },
+                    { "x": 1, "y": 0 }
+                  ]
                 }
                 """;
 
@@ -66,6 +73,7 @@ class KebunControllerTest {
                 .name("Kebun Sawit B")
                 .code("KBNB02")
                 .luas(120.0)
+                .coordinates(squarePoints())
                 .build();
 
         when(kebunService.getByCode("KBNB02")).thenReturn(Optional.of(kebun));
@@ -86,8 +94,8 @@ class KebunControllerTest {
 
     @Test
     void getKebunListShouldSupportNameFilter() throws Exception {
-        Kebun kebun1 = Kebun.builder().name("Kebun Sawit A").code("KBNA01").luas(100.0).build();
-        Kebun kebun2 = Kebun.builder().name("Kebun Sawit B").code("KBNB02").luas(200.0).build();
+        Kebun kebun1 = Kebun.builder().name("Kebun Sawit A").code("KBNA01").luas(100.0).coordinates(squarePoints()).build();
+        Kebun kebun2 = Kebun.builder().name("Kebun Sawit B").code("KBNB02").luas(200.0).coordinates(offsetSquarePoints()).build();
 
         when(kebunService.findByFilters("Sawit", "")).thenReturn(List.of(kebun1, kebun2));
 
@@ -103,6 +111,7 @@ class KebunControllerTest {
                 .name("Kebun Sawit A Updated")
                 .code("KBNA01")
                 .luas(150.0)
+                .coordinates(squarePoints())
                 .build();
 
         when(kebunService.update(any(), any(Kebun.class))).thenReturn(updated);
@@ -111,7 +120,13 @@ class KebunControllerTest {
                 {
                   "name": "Kebun Sawit A Updated",
                   "code": "KBNA01",
-                  "luas": 150.0
+                  "luas": 150.0,
+                  "coordinates": [
+                    { "x": 0, "y": 0 },
+                    { "x": 0, "y": 1 },
+                    { "x": 1, "y": 1 },
+                    { "x": 1, "y": 0 }
+                  ]
                 }
                 """;
 
@@ -133,7 +148,7 @@ class KebunControllerTest {
 
     @Test
     void getKebunListShouldSupportNameAndCodeFilter() throws Exception {
-        Kebun kebun = Kebun.builder().name("Kebun Sawit A").code("KBNA01").luas(100.0).build();
+        Kebun kebun = Kebun.builder().name("Kebun Sawit A").code("KBNA01").luas(100.0).coordinates(squarePoints()).build();
         when(kebunService.findByFilters("Sawit", "A01")).thenReturn(List.of(kebun));
 
         mockMvc.perform(get("/kebun").param("name", "Sawit").param("code", "A01"))
@@ -233,5 +248,23 @@ class KebunControllerTest {
                 .andExpect(jsonPath("$.message").value("Supir reassigned to another kebun"));
 
         verify(kebunService).reassignSupirToAnotherKebun("KB001", "11", "KB002");
+    }
+
+    private List<Kebun.Point> squarePoints() {
+        return List.of(
+                new Kebun.Point(0, 0),
+                new Kebun.Point(0, 1),
+                new Kebun.Point(1, 1),
+                new Kebun.Point(1, 0)
+        );
+    }
+
+    private List<Kebun.Point> offsetSquarePoints() {
+        return List.of(
+                new Kebun.Point(2, 2),
+                new Kebun.Point(2, 3),
+                new Kebun.Point(3, 3),
+                new Kebun.Point(3, 2)
+        );
     }
 }

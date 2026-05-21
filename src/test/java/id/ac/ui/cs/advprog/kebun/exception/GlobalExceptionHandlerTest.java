@@ -11,6 +11,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.NoSuchElementException;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -38,7 +40,13 @@ class GlobalExceptionHandlerTest {
                 {
                   "name": "Invalid",
                   "code": "DIFFERENT",
-                  "luas": 100.0
+                  "luas": 100.0,
+                  "coordinates": [
+                    { "x": 0, "y": 0 },
+                    { "x": 0, "y": 1 },
+                    { "x": 1, "y": 1 },
+                    { "x": 1, "y": 0 }
+                  ]
                 }
                 """;
 
@@ -57,5 +65,31 @@ class GlobalExceptionHandlerTest {
         mockMvc.perform(delete("/kebun/{code}", "KBNA01"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("Cannot delete kebun with active mandor"));
+    }
+
+    @Test
+    void shouldMapNoSuchElementExceptionToNotFound() throws Exception {
+        doThrow(new NoSuchElementException("Kebun not found with code: UNKNOWN"))
+                .when(kebunService).update(eq("UNKNOWN"), any(Kebun.class));
+
+        String requestBody = """
+                {
+                  "name": "Missing",
+                  "code": "UNKNOWN",
+                  "luas": 100.0,
+                  "coordinates": [
+                    { "x": 0, "y": 0 },
+                    { "x": 0, "y": 1 },
+                    { "x": 1, "y": 1 },
+                    { "x": 1, "y": 0 }
+                  ]
+                }
+                """;
+
+        mockMvc.perform(put("/kebun/{code}", "UNKNOWN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Kebun not found with code: UNKNOWN"));
     }
 }

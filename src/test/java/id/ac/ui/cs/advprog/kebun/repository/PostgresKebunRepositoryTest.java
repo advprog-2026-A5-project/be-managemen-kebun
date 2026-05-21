@@ -24,7 +24,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,28 +46,30 @@ class PostgresKebunRepositoryTest {
     @Test
     void acquireGlobalWriteLockShouldInvokeAdvisoryLockQuery() {
         repository.acquireGlobalWriteLock();
+        verify(jdbcTemplate).query(anyString(), any(org.springframework.jdbc.core.RowCallbackHandler.class), eq(0x4B4542554EL));
+    }
+
+    @Test
+    void existsByCodeShouldReturnTrueWhenCountPositive() {
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("KBNA01"))).thenReturn(1);
+
+        assertTrue(repository.existsByCode("KBNA01"));
+    }
+
+    @Test
+    void existsByCodeShouldReturnFalseWhenCountZero() {
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq("KBNA01"))).thenReturn(0);
+
+        assertFalse(repository.existsByCode("KBNA01"));
     }
 
     @Test
     @SuppressWarnings("unchecked")
     void existsIntersectingShouldReturnTrueWhenPolygonIntersects() {
-        List<Kebun.Point> existingPoints = List.of(
-                new Kebun.Point(0, 0),
-                new Kebun.Point(0, 2),
-                new Kebun.Point(2, 2),
-                new Kebun.Point(2, 0)
-        );
+        Kebun existing = kebun("Existing", "KBNA01", 100.0, squarePoints());
+        doReturn(List.of(existing)).when(jdbcTemplate).query(anyString(), any(RowMapper.class), any(), any());
 
-        Kebun existing = Kebun.builder()
-                .name("Existing")
-                .code("KBNA01")
-                .luas(100.0)
-                .coordinates(existingPoints)
-                .build();
-
-        doReturn(List.of(existing)).when(jdbcTemplate).query(anyString(), any(RowMapper.class));
-
-        Polygon candidate = id.ac.ui.cs.advprog.kebun.mapper.GeometryMapper.toPolygon(existingPoints);
+        Polygon candidate = id.ac.ui.cs.advprog.kebun.mapper.GeometryMapper.toPolygon(squarePoints());
 
         assertTrue(repository.existsIntersecting(candidate));
     }
@@ -76,74 +77,77 @@ class PostgresKebunRepositoryTest {
     @Test
     @SuppressWarnings("unchecked")
     void existsIntersectingShouldReturnFalseWhenNoRows() {
-        doReturn(List.of()).when(jdbcTemplate).query(anyString(), any(RowMapper.class));
+        doReturn(List.of()).when(jdbcTemplate).query(anyString(), any(RowMapper.class), any(), any());
 
-        List<Kebun.Point> points = List.of(
-                new Kebun.Point(10, 10),
-                new Kebun.Point(10, 12),
-                new Kebun.Point(12, 12),
-                new Kebun.Point(12, 10)
-        );
-        Polygon candidate = id.ac.ui.cs.advprog.kebun.mapper.GeometryMapper.toPolygon(points);
+        Polygon candidate = id.ac.ui.cs.advprog.kebun.mapper.GeometryMapper.toPolygon(offsetSquarePoints());
 
         assertFalse(repository.existsIntersecting(candidate));
     }
 
     @Test
-    void saveShouldInsertOrUpdateKebun() throws Exception {
-        Kebun kebun = Kebun.builder()
-                .name("Alpha")
-                .code("KBNA01")
-                .luas(123.45)
-                .coordinates(List.of(
-                        new Kebun.Point(1, 1),
-                        new Kebun.Point(1, 2),
-                        new Kebun.Point(2, 2),
-                        new Kebun.Point(2, 1)
-                ))
-                .build();
+    @SuppressWarnings("unchecked")
+    void existsIntersectingExcludingCodeShouldIgnoreExcludedKebun() {
+        doReturn(List.of()).when(jdbcTemplate).query(anyString(), any(RowMapper.class), eq("KBNA01"), eq("KBNA01"));
 
-        when(objectMapper.writeValueAsString(kebun.getCoordinates())).thenReturn("[{\"x\":1.0,\"y\":1.0}]");
+        Polygon candidate = id.ac.ui.cs.advprog.kebun.mapper.GeometryMapper.toPolygon(squarePoints());
 
-        Kebun saved = repository.save(kebun);
-
-        assertEquals(kebun, saved);
-        verify(jdbcTemplate).update(anyString(), eq("KBNA01"), eq("Alpha"), eq(123.45), anyString());
+        assertFalse(repository.existsIntersectingExcludingCode(candidate, "KBNA01"));
     }
 
     @Test
-    void saveShouldThrowWhenSerializationFails() throws Exception {
-        Kebun kebun = Kebun.builder()
-                .name("Alpha")
-                .code("KBNA01")
-                .luas(123.45)
-                .coordinates(List.of(
-                        new Kebun.Point(1, 1),
-                        new Kebun.Point(1, 2),
-                        new Kebun.Point(2, 2),
-                        new Kebun.Point(2, 1)
-                ))
-                .build();
+    void createShouldInsertKebunWithoutUpsert() throws Exception {
+        Kebun kebun = kebun("Alpha", "KBNA01", 123.45, squarePoints());
+        when(objectMapper.writeValueAsString(kebun.getCoordinates())).thenReturn("[{\"x\":0.0,\"y\":0.0}]");
 
-        when(objectMapper.writeValueAsString(any())).thenThrow(new JsonProcessingException("boom") {});
+        Kebun created = repository.create(kebun);
 
-        assertThrows(IllegalStateException.class, () -> repository.save(kebun));
+        assertEquals(kebun, created);
+        verify(jdbcTemplate).update(
+                eq("INSERT INTO kebun (code, name, luas, coordinates_json) VALUES (?, ?, ?, ?)"),
+                eq("KBNA01"),
+                eq("Alpha"),
+                eq(123.45),
+                anyString()
+        );
+    }
+
+    @Test
+    void createShouldThrowWhenSerializationFails() throws Exception {
+        Kebun kebun = kebun("Alpha", "KBNA01", 123.45, squarePoints());
+        when(objectMapper.writeValueAsString(any())).thenThrow(new JsonProcessingException("boom") { });
+
+        assertThrows(IllegalStateException.class, () -> repository.create(kebun));
+    }
+
+    @Test
+    void updateShouldPersistByCode() throws Exception {
+        Kebun kebun = kebun("Alpha Updated", "KBNA01", 200.0, offsetSquarePoints());
+        when(objectMapper.writeValueAsString(kebun.getCoordinates())).thenReturn("[{\"x\":3.0,\"y\":0.0}]");
+
+        Kebun updated = repository.update(kebun);
+
+        assertEquals(kebun, updated);
+        verify(jdbcTemplate).update(
+                eq("UPDATE kebun SET name = ?, luas = ?, coordinates_json = ? WHERE code = ?"),
+                eq("Alpha Updated"),
+                eq(200.0),
+                anyString(),
+                eq("KBNA01")
+        );
+    }
+
+    @Test
+    void updateShouldThrowWhenSerializationFails() throws Exception {
+        Kebun kebun = kebun("Alpha Updated", "KBNA01", 200.0, offsetSquarePoints());
+        when(objectMapper.writeValueAsString(any())).thenThrow(new JsonProcessingException("boom") { });
+
+        assertThrows(IllegalStateException.class, () -> repository.update(kebun));
     }
 
     @Test
     @SuppressWarnings("unchecked")
     void findByCodeShouldReturnKebunWhenExists() {
-        Kebun kebun = Kebun.builder()
-                .name("A")
-                .code("KBNA01")
-                .luas(1.0)
-                .coordinates(List.of(
-                        new Kebun.Point(0, 0),
-                        new Kebun.Point(0, 1),
-                        new Kebun.Point(1, 1),
-                        new Kebun.Point(1, 0)
-                ))
-                .build();
+        Kebun kebun = kebun("A", "KBNA01", 1.0, squarePoints());
         doReturn(kebun).when(jdbcTemplate).queryForObject(anyString(), any(RowMapper.class), eq("KBNA01"));
 
         Optional<Kebun> result = repository.findByCode("KBNA01");
@@ -166,17 +170,7 @@ class PostgresKebunRepositoryTest {
     @Test
     @SuppressWarnings("unchecked")
     void findByNameShouldDelegateLikeQuery() {
-        Kebun kebun = Kebun.builder()
-                .name("Sawit")
-                .code("KBNA01")
-                .luas(1.0)
-                .coordinates(List.of(
-                        new Kebun.Point(0, 0),
-                        new Kebun.Point(0, 1),
-                        new Kebun.Point(1, 1),
-                        new Kebun.Point(1, 0)
-                ))
-                .build();
+        Kebun kebun = kebun("Sawit", "KBNA01", 1.0, squarePoints());
         doReturn(List.of(kebun)).when(jdbcTemplate).query(anyString(), any(RowMapper.class), eq("%saw%"));
 
         List<Kebun> result = repository.findByNameContainingIgnoreCase("saw");
@@ -197,17 +191,7 @@ class PostgresKebunRepositoryTest {
     @Test
     @SuppressWarnings("unchecked")
     void findByNameAndCodeShouldDelegateCombinedLikeQuery() {
-        Kebun kebun = Kebun.builder()
-                .name("Sawit")
-                .code("KBNA01")
-                .luas(1.0)
-                .coordinates(List.of(
-                        new Kebun.Point(0, 0),
-                        new Kebun.Point(0, 1),
-                        new Kebun.Point(1, 1),
-                        new Kebun.Point(1, 0)
-                ))
-                .build();
+        Kebun kebun = kebun("Sawit", "KBNA01", 1.0, squarePoints());
         doReturn(List.of(kebun))
                 .when(jdbcTemplate)
                 .query(anyString(), any(RowMapper.class), eq("%saw%"), eq("%na0%"));
@@ -313,12 +297,7 @@ class PostgresKebunRepositoryTest {
 
     @Test
     void findByCodeShouldMapCoordinatesFromJson() throws Exception {
-        List<Kebun.Point> points = List.of(
-                new Kebun.Point(1, 1),
-                new Kebun.Point(1, 2),
-                new Kebun.Point(2, 2),
-                new Kebun.Point(2, 1)
-        );
+        List<Kebun.Point> points = squarePoints();
         when(objectMapper.readValue(anyString(), any(com.fasterxml.jackson.core.type.TypeReference.class)))
                 .thenReturn(points);
 
@@ -343,7 +322,7 @@ class PostgresKebunRepositoryTest {
     @SuppressWarnings("unchecked")
     void findByCodeShouldThrowWhenDeserializationFails() throws Exception {
         when(objectMapper.readValue(anyString(), any(com.fasterxml.jackson.core.type.TypeReference.class)))
-                .thenThrow(new JsonProcessingException("bad json") {});
+                .thenThrow(new JsonProcessingException("bad json") { });
 
         when(jdbcTemplate.queryForObject(anyString(), any(RowMapper.class), eq("KBNA01")))
                 .thenAnswer(invocation -> {
@@ -357,5 +336,32 @@ class PostgresKebunRepositoryTest {
                 });
 
         assertThrows(IllegalStateException.class, () -> repository.findByCode("KBNA01"));
+    }
+
+    private Kebun kebun(String name, String code, double luas, List<Kebun.Point> coordinates) {
+        return Kebun.builder()
+                .name(name)
+                .code(code)
+                .luas(luas)
+                .coordinates(coordinates)
+                .build();
+    }
+
+    private List<Kebun.Point> squarePoints() {
+        return List.of(
+                new Kebun.Point(0, 0),
+                new Kebun.Point(0, 2),
+                new Kebun.Point(2, 2),
+                new Kebun.Point(2, 0)
+        );
+    }
+
+    private List<Kebun.Point> offsetSquarePoints() {
+        return List.of(
+                new Kebun.Point(3, 0),
+                new Kebun.Point(3, 2),
+                new Kebun.Point(5, 2),
+                new Kebun.Point(5, 0)
+        );
     }
 }

@@ -56,4 +56,36 @@ class OverlapValidatorImplTest {
 
         assertThrows(IllegalArgumentException.class, () -> overlapValidator.validateNoOverlap(points));
     }
+
+    @Test
+    void validateShouldIgnoreCurrentKebunDuringUpdateOverlapCheck() {
+        List<Kebun.Point> points = List.of(
+                new Kebun.Point(0, 0),
+                new Kebun.Point(0, 2),
+                new Kebun.Point(2, 2),
+                new Kebun.Point(2, 0)
+        );
+
+        Polygon polygon = GeometryMapper.toPolygon(points);
+
+        when(kebunRepository.existsIntersectingExcludingCode(polygon, "KB001")).thenReturn(false);
+
+        assertDoesNotThrow(() -> overlapValidator.validateNoOverlap(points, "KB001"));
+    }
+
+    @Test
+    void validateShouldRejectBoundaryTouchingBecauseIntersectCountsSharedEdgeAsOverlap() {
+        List<Kebun.Point> points = List.of(
+                new Kebun.Point(2, 0),
+                new Kebun.Point(2, 2),
+                new Kebun.Point(4, 2),
+                new Kebun.Point(4, 0)
+        );
+
+        Polygon polygon = GeometryMapper.toPolygon(points);
+
+        when(kebunRepository.existsIntersecting(polygon)).thenReturn(true);
+
+        assertThrows(IllegalArgumentException.class, () -> overlapValidator.validateNoOverlap(points));
+    }
 }
