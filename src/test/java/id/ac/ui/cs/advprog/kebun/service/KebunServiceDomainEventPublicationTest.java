@@ -37,7 +37,7 @@ class KebunServiceDomainEventPublicationTest {
         );
 
         when(kebunRepository.findByCode("KB001")).thenReturn(Optional.of(
-                Kebun.builder().name("Kebun A").code("KB001").luas(100.0).build()
+                Kebun.builder().name("Kebun A").code("KB001").luas(100.0).coordinates(squarePoints()).build()
         ));
 
         kebunService.assignMandor("KB001", "mandor-123");
@@ -47,5 +47,14 @@ class KebunServiceDomainEventPublicationTest {
                         && "KB001".equals(((MandorAssignedEvent) event).getKebunCode())
                         && "mandor-123".equals(((MandorAssignedEvent) event).getMandorId())
         ));
+    }
+
+    private java.util.List<Kebun.Point> squarePoints() {
+        return java.util.List.of(
+                new Kebun.Point(0, 0),
+                new Kebun.Point(0, 1),
+                new Kebun.Point(1, 1),
+                new Kebun.Point(1, 0)
+        );
     }
 }

@@ -49,7 +49,7 @@ public class KebunController {
     public ResponseEntity<List<Kebun>> getAllByName(
             @RequestParam(name = "name", required = false) String name,
             @RequestParam(name = "code", required = false) String code) {
-        List<Kebun> kebuns = kebunService.findByFilters(name == null ? "" : name, code == null ? "" : code);
+        List<Kebun> kebuns = kebunService.findByFilters(normalizeFilter(name), normalizeFilter(code));
         return ResponseEntity.ok(kebuns);
     }
 
@@ -100,5 +100,9 @@ public class KebunController {
             @RequestBody SupirReassignmentRequest request) {
         kebunService.reassignSupirToAnotherKebun(code, request.supirId(), request.replacementKebunCode());
         return ResponseEntity.ok(Map.of("message", "Supir reassigned to another kebun"));
+    }
+
+    private String normalizeFilter(String value) {
+        return value == null ? "" : value.trim();
     }
 }
