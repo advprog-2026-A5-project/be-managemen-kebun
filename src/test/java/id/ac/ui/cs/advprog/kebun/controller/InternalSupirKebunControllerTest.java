@@ -1,9 +1,12 @@
 package id.ac.ui.cs.advprog.kebun.controller;
 
 import id.ac.ui.cs.advprog.kebun.dto.SupirKebunAssignmentResponse;
+import id.ac.ui.cs.advprog.kebun.security.InternalApiTokenFilter;
+import id.ac.ui.cs.advprog.kebun.security.JwtAuthenticationFilter;
 import id.ac.ui.cs.advprog.kebun.service.KebunService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -15,6 +18,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(InternalSupirKebunController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class InternalSupirKebunControllerTest {
 
     @Autowired
@@ -22,6 +26,12 @@ class InternalSupirKebunControllerTest {
 
     @MockBean
     private KebunService kebunService;
+
+    @MockBean
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @MockBean
+    private InternalApiTokenFilter internalApiTokenFilter;
 
     @Test
     void getSupirKebunAssignmentShouldReturnActiveWhenAssigned() throws Exception {
