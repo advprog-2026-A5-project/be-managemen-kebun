@@ -2,7 +2,8 @@ global:
   scrape_interval: 5s
 
 scrape_configs:
-  - job_name: "be-managemen-kebun-local"
+  - job_name: "kebun-service"
     metrics_path: "/actuator/prometheus"
     static_configs:
-      - targets: ["host.docker.internal:8081"]
+      # Replace <KEBUN_HOST> with the deployed EC2 public DNS/IP for kebun.
+      - targets: ["<KEBUN_HOST>:8081"]

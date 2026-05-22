@@ -279,6 +279,17 @@ class KebunServiceTest {
     }
 
     @Test
+    void deleteShouldProceedWhenOnlySupirAssignmentsExist() {
+        Kebun existing = kebun("Kebun Sawit A", "KBNA01", 100.0, squarePoints());
+        when(kebunRepository.findByCode("KBNA01")).thenReturn(Optional.of(existing));
+        when(kebunRepository.existsActiveMandorByKebunCode("KBNA01")).thenReturn(false);
+
+        kebunService.delete("KBNA01");
+
+        verify(kebunRepository).deleteByCode("KBNA01");
+    }
+
+    @Test
     void deleteShouldThrowWhenKebunDoesNotExist() {
         when(kebunRepository.findByCode("MISSING")).thenReturn(Optional.empty());
 
@@ -361,6 +372,7 @@ class KebunServiceTest {
         when(personnelDirectory.requireMandorId("3")).thenReturn("3");
         when(kebunRepository.findByCode("KB001")).thenReturn(Optional.of(current));
         when(kebunRepository.findByCode("KB002")).thenReturn(Optional.of(replacement));
+        when(kebunRepository.isMandorAssignedToKebun("KB001", "3")).thenReturn(true);
 
         kebunService.reassignMandorToAnotherKebun("KB001", "3", "KB002");
 
@@ -393,6 +405,32 @@ class KebunServiceTest {
     void reassignMandorShouldThrowWhenReplacementMissing() {
         assertThrows(IllegalArgumentException.class,
                 () -> kebunService.reassignMandorToAnotherKebun("KB001", "3", " "));
+    }
+
+    @Test
+    void reassignMandorShouldThrowWhenReassigningToSameKebun() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> kebunService.reassignMandorToAnotherKebun("KB001", "3", "KB001"));
+
+        assertEquals("Replacement kebun must be different from current kebun", ex.getMessage());
+        verify(kebunRepository, never()).assignMandor(any(), any());
+    }
+
+    @Test
+    void reassignMandorShouldThrowWhenMandorIsNotAssignedToSourceKebun() {
+        Kebun current = kebun("Kebun A", "KB001", 100.0, squarePoints());
+        Kebun replacement = kebun("Kebun B", "KB002", 120.0, offsetSquarePoints());
+        when(personnelDirectory.requireMandorId("3")).thenReturn("3");
+        when(kebunRepository.findByCode("KB001")).thenReturn(Optional.of(current));
+        when(kebunRepository.findByCode("KB002")).thenReturn(Optional.of(replacement));
+        when(kebunRepository.isMandorAssignedToKebun("KB001", "3")).thenReturn(false);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> kebunService.reassignMandorToAnotherKebun("KB001", "3", "KB002"));
+
+        assertEquals("Mandor is not assigned to the source kebun", ex.getMessage());
+        verify(kebunRepository, never()).unassignMandor(any(), any());
+        verify(kebunRepository, never()).assignMandor(any(), any());
     }
 
     @Test
@@ -443,6 +481,7 @@ class KebunServiceTest {
         when(personnelDirectory.requireSupirId("11")).thenReturn("11");
         when(kebunRepository.findByCode("KB001")).thenReturn(Optional.of(current));
         when(kebunRepository.findByCode("KB002")).thenReturn(Optional.of(replacement));
+        when(kebunRepository.isSupirAssignedToKebun("KB001", "11")).thenReturn(true);
 
         kebunService.reassignSupirToAnotherKebun("KB001", "11", "KB002");
 
@@ -469,6 +508,32 @@ class KebunServiceTest {
     void reassignSupirShouldThrowWhenReplacementMissing() {
         assertThrows(IllegalArgumentException.class,
                 () -> kebunService.reassignSupirToAnotherKebun("KB001", "11", " "));
+    }
+
+    @Test
+    void reassignSupirShouldThrowWhenReassigningToSameKebun() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> kebunService.reassignSupirToAnotherKebun("KB001", "11", "KB001"));
+
+        assertEquals("Replacement kebun must be different from current kebun", ex.getMessage());
+        verify(kebunRepository, never()).assignSupir(any(), any());
+    }
+
+    @Test
+    void reassignSupirShouldThrowWhenSupirIsNotAssignedToSourceKebun() {
+        Kebun current = kebun("Kebun A", "KB001", 100.0, squarePoints());
+        Kebun replacement = kebun("Kebun B", "KB002", 120.0, offsetSquarePoints());
+        when(personnelDirectory.requireSupirId("11")).thenReturn("11");
+        when(kebunRepository.findByCode("KB001")).thenReturn(Optional.of(current));
+        when(kebunRepository.findByCode("KB002")).thenReturn(Optional.of(replacement));
+        when(kebunRepository.isSupirAssignedToKebun("KB001", "11")).thenReturn(false);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> kebunService.reassignSupirToAnotherKebun("KB001", "11", "KB002"));
+
+        assertEquals("Supir is not assigned to the source kebun", ex.getMessage());
+        verify(kebunRepository, never()).unassignSupir(any(), any());
+        verify(kebunRepository, never()).assignSupir(any(), any());
     }
 
     @Test

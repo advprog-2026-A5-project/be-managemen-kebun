@@ -35,6 +35,8 @@ public interface KebunRepository {
 
     void unassignAnyMandorFromKebun(String kebunCode);
 
+    boolean isMandorAssignedToKebun(String kebunCode, String mandorId);
+
     Optional<String> findMandorIdByKebunCode(String kebunCode);
 
     List<String> findSupirIdsByKebunCode(String kebunCode);
@@ -44,6 +46,8 @@ public interface KebunRepository {
     void unassignSupir(String kebunCode, String supirId);
 
     void unassignSupirFromAnyKebun(String supirId);
+
+    boolean isSupirAssignedToKebun(String kebunCode, String supirId);
 
     void deleteByCode(String code);
 

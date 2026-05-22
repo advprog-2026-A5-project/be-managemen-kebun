@@ -114,3 +114,177 @@ jobs:
             sleep 8
             tail -n 80 /opt/be-management-kebun/app.log
           EOF
+
+
+    deploy-monitoring:
+      name: Deploy Prometheus and Grafana
+      runs-on: ubuntu-latest
+      needs: deploy-aws
+
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+      steps:
+        - name: Prepare SSH key
+          run: |
+            mkdir -p ~/.ssh
+            echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key.pem
+            chmod 600 ~/.ssh/ec2_key.pem
+
+        - name: Deploy monitoring stack to EC2
+          run: |
+            ssh -o StrictHostKeyChecking=no -i ~/.ssh/ec2_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+              set -e
+
+              sudo dnf install -y docker
+              sudo systemctl enable docker
+              sudo systemctl start docker
+
+              sudo mkdir -p /opt/mysawit-monitoring/grafana/provisioning/datasources
+              sudo mkdir -p /opt/mysawit-monitoring/grafana/provisioning/dashboards
+              sudo mkdir -p /opt/mysawit-monitoring/grafana/dashboards
+              sudo chown -R ec2-user:ec2-user /opt/mysawit-monitoring
+
+              cat > /opt/mysawit-monitoring/prometheus.yml << 'PROMEOF'
+              global:
+                scrape_interval: 5s
+
+              scrape_configs:
+                - job_name: "kebun-service"
+                  metrics_path: "/actuator/prometheus"
+                  static_configs:
+                    - targets: ["host.docker.internal:8081"]
+              PROMEOF
+
+              cat > /opt/mysawit-monitoring/grafana/provisioning/datasources/prometheus.yml << 'DATASOURCEEOF'
+              apiVersion: 1
+
+              datasources:
+                - name: Prometheus
+                  type: prometheus
+                  access: proxy
+                  url: http://prometheus:9090
+                  isDefault: true
+              DATASOURCEEOF
+
+              cat > /opt/mysawit-monitoring/grafana/provisioning/dashboards/dashboards.yml << 'DASHBOARDPROVIDER'
+              apiVersion: 1
+
+              providers:
+                - name: MySawit
+                  orgId: 1
+                  folder: MySawit
+                  type: file
+                  disableDeletion: false
+                  editable: true
+                  options:
+                    path: /var/lib/grafana/dashboards
+              DASHBOARDPROVIDER
+
+              cat > /opt/mysawit-monitoring/grafana/dashboards/kebun-dashboard.json << 'DASHBOARDEOF'
+              {
+                "uid": "mysawit-kebun",
+                "title": "MySawit Kebun Monitoring",
+                "schemaVersion": 38,
+                "version": 1,
+                "refresh": "5s",
+                "panels": [
+                  {
+                    "type": "timeseries",
+                    "title": "Kebun Request Rate",
+                    "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+                    "targets": [
+                      {
+                        "expr": "sum(rate(http_server_requests_seconds_count{job=\"kebun-service\"}[1m]))",
+                        "refId": "A"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "timeseries",
+                    "title": "Kebun 500 Error Rate",
+                    "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+                    "targets": [
+                      {
+                        "expr": "sum(rate(http_server_requests_seconds_count{job=\"kebun-service\",status=\"500\"}[1m]))",
+                        "refId": "A"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "timeseries",
+                    "title": "Kebun JVM Memory Used",
+                    "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+                    "targets": [
+                      {
+                        "expr": "sum(jvm_memory_used_bytes{job=\"kebun-service\"})",
+                        "refId": "A"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "timeseries",
+                    "title": "Kebun CPU Usage",
+                    "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+                    "targets": [
+                      {
+                        "expr": "process_cpu_usage{job=\"kebun-service\"}",
+                        "refId": "A"
+                      }
+                    ]
+                  }
+                ]
+              }
+              DASHBOARDEOF
+
+              cat > /opt/mysawit-monitoring/docker-compose.monitoring.yml << 'COMPOSEEOF'
+              services:
+                prometheus:
+                  image: prom/prometheus:latest
+                  container_name: mysawit-prometheus
+                  restart: unless-stopped
+                  ports:
+                    - "9090:9090"
+                  extra_hosts:
+                    - "host.docker.internal:host-gateway"
+                  volumes:
+                    - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+                    - prometheus-data:/prometheus
+                  command:
+                    - "--config.file=/etc/prometheus/prometheus.yml"
+
+                grafana:
+                  image: grafana/grafana:latest
+                  container_name: mysawit-grafana
+                  restart: unless-stopped
+                  ports:
+                    - "3001:3000"
+                  environment:
+                    - GF_SECURITY_ADMIN_USER=admin
+                    - GF_SECURITY_ADMIN_PASSWORD=admin
+                  volumes:
+                    - grafana-data:/var/lib/grafana
+                    - ./grafana/provisioning:/etc/grafana/provisioning:ro
+                    - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+                  depends_on:
+                    - prometheus
+
+              volumes:
+                prometheus-data:
+                grafana-data:
+              COMPOSEEOF
+
+              cd /opt/mysawit-monitoring
+
+              if docker compose version >/dev/null 2>&1; then
+                docker compose -f docker-compose.monitoring.yml up -d
+              else
+                sudo curl -L "https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
+                sudo chmod +x /usr/local/bin/docker-compose
+                docker-compose -f docker-compose.monitoring.yml up -d
+              fi
+
+              sleep 10
+
+              curl -f http://localhost:9090/-/ready
+              docker ps
+            EOF
