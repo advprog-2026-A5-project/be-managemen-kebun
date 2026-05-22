@@ -84,6 +84,24 @@ class SecurityIntegrationTest {
     }
 
     @Test
+    void actuatorHealthEndpointShouldRemainPublic() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(result -> assertNotUnauthorizedOrForbidden(result.getResponse().getStatus()));
+    }
+
+    @Test
+    void actuatorInfoEndpointShouldRemainPublic() throws Exception {
+        mockMvc.perform(get("/actuator/info"))
+                .andExpect(result -> assertNotUnauthorizedOrForbidden(result.getResponse().getStatus()));
+    }
+
+    @Test
+    void actuatorPrometheusEndpointShouldRemainPublic() throws Exception {
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(result -> assertNotUnauthorizedOrForbidden(result.getResponse().getStatus()));
+    }
+
+    @Test
     void internalEndpointShouldRejectWhenTokenMissing() throws Exception {
         mockMvc.perform(get("/internal/mandors/{mandorId}/kebun", 7L))
                 .andExpect(result -> assertUnauthorizedOrForbidden(result.getResponse().getStatus()));
@@ -202,5 +220,9 @@ class SecurityIntegrationTest {
 
     private void assertUnauthorizedOrForbidden(int status) {
         assertTrue(status == 401 || status == 403);
+    }
+
+    private void assertNotUnauthorizedOrForbidden(int status) {
+        assertTrue(status != 401 && status != 403);
     }
 }
